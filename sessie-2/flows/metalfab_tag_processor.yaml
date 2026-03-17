@@ -1,0 +1,19 @@
+defaults: |
+  msg.meta.location_path = "{{ .location_path }}";
+  msg.meta.data_contract = "_raw";
+  msg.meta.tag_name = "raw";
+  return msg;
+advancedProcessing: |
+  let topic_parts = (msg.meta["mqtt_topic"] || "").split("/");
+  // umh/v1/metalfab/eindhoven/cutting/laser_01/_raw/laser_power
+  //  [0] [1]  [2]      [3]     [4]     [5]    [6]    [7...]
+
+  let location = topic_parts.slice(2, 6).join(".");
+  let tag = topic_parts.slice(7).join(".");
+
+  msg.meta.location_path = location;
+  msg.meta.data_contract = "_raw";
+  msg.meta.tag_name = tag;
+  msg.meta.timestamp_ms = Date.now().toString();
+
+  return msg;

@@ -1,0 +1,29 @@
+defaults: |
+  msg.meta.location_path = "{{ .location_path }}";
+  msg.meta.data_contract = "_raw";
+  msg.meta.tag_name = "raw";
+  return msg;
+advancedProcessing: |
+  let topic_parts = (msg.meta["mqtt_topic"] || "").split("/");
+  let device = topic_parts[4] || "unknown";
+  let data = typeof msg.payload === "string" ? JSON.parse(msg.payload) : msg.payload;
+
+  let base_meta = {
+    location_path: msg.meta.location_path + ".tasmota." + device,
+    data_contract: "_raw",
+    timestamp_ms: Date.now().toString()
+  };
+
+  let messages = [];
+
+  if (data.ANALOG && data.ANALOG.Temperature !== undefined) {
+    messages.push({ payload: data.ANALOG.Temperature, meta: Object.assign({}, base_meta, { tag_name: "temperature" }) });
+  }
+  if (data.ENERGY && data.ENERGY.Power !== undefined) {
+    messages.push({ payload: data.ENERGY.Power, meta: Object.assign({}, base_meta, { tag_name: "power" }) });
+  }
+  if (data.ENERGY && data.ENERGY.Voltage !== undefined) {
+    messages.push({ payload: data.ENERGY.Voltage, meta: Object.assign({}, base_meta, { tag_name: "voltage" }) });
+  }
+
+  return messages;
