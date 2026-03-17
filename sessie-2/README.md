@@ -246,7 +246,7 @@ TimescaleDB. Eenmaal deployed werkt het voor beide demo's automatisch.
 
 ### Deploy via Management Console
 1. Ga naar Data Flows → Stand-alone → Add
-2. Plak de 3 secties uit `examples/databridges/flows/historian.yaml`
+2. Plak de 3 secties uit `sessie-2/flows/historian.yaml`
 3. Save & Deploy
 
 ### Wat het doet

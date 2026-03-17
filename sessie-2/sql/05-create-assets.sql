@@ -24,12 +24,12 @@
 -- =================================================================
 
 -- Tasmota Energy Sensors (Home Lab)
--- NB: site = 'workshop' moet overeenkomen met de bridge location in UMH Core
+-- NB: site = 'hq' moet overeenkomen met de bridge location in UMH Core
 INSERT INTO asset (asset_name, enterprise, site, area, line)
 VALUES
-  ('smc.workshop.tasmota.cabinet',   'smc', 'workshop', 'tasmota', 'cabinet'),
-  ('smc.workshop.tasmota.siderack',  'smc', 'workshop', 'tasmota', 'siderack'),
-  ('smc.workshop.tasmota.desk',      'smc', 'workshop', 'tasmota', 'desk')
+  ('smc.hq.tasmota.cabinet',   'smc', 'hq', 'tasmota', 'cabinet'),
+  ('smc.hq.tasmota.siderack',  'smc', 'hq', 'tasmota', 'siderack'),
+  ('smc.hq.tasmota.desk',      'smc', 'hq', 'tasmota', 'desk')
 ON CONFLICT (enterprise, site, area, line, workcell, origin_id) DO NOTHING;
 
 -- MetalFab Simulator (Cloud)
