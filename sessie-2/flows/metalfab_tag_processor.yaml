@@ -1,3 +1,37 @@
+# ==============================================================================
+# MetalFab Simulator — Tag Processor
+# ==============================================================================
+# Plak in: Bridge → Read tab → Code mode AAN
+#
+# De cloud simulator (95.217.14.139:1883) stuurt data in UMH-formaat.
+# Elk MQTT bericht is al 1 waarde per topic — geen JSON parsing nodig.
+#
+# Bridge General tab:
+#   Connection: 95.217.14.139:1883
+#   Location: metalfab.eindhoven (of laat leeg, advancedProcessing overschrijft het)
+#
+# Bridge Read tab — MQTT topics:
+#   Optie A (alleen laser, voor de les):
+#     umh/v1/metalfab/eindhoven/cutting/laser_01/_raw/laser_power
+#     umh/v1/metalfab/eindhoven/cutting/laser_01/_raw/state
+#     umh/v1/metalfab/eindhoven/cutting/laser_01/_raw/state_name
+#
+#   Optie B (hele machine):
+#     umh/v1/metalfab/eindhoven/cutting/laser_01/_raw/#
+#
+#   Optie C (twee machines):
+#     umh/v1/metalfab/eindhoven/cutting/laser_01/_raw/#
+#     umh/v1/metalfab/eindhoven/forming/press_brake_01/_raw/#
+#
+# Beschikbare tags per machine:
+#   laser_01:       laser_power, cutting_speed, assist_gas, focal_position,
+#                   sheet_temp, state, state_name, infeed, outfeed, waste,
+#                   oee.availability, oee.quality, oee.performance, oee.oee
+#   press_brake_01: tonnage, bend_angle, stroke_position, backgauge_pos,
+#                   state, state_name, infeed, outfeed, waste,
+#                   oee.availability, oee.quality, oee.performance, oee.oee
+# ==============================================================================
+
 defaults: |
   msg.meta.location_path = "{{ .location_path }}";
   msg.meta.data_contract = "_raw";
