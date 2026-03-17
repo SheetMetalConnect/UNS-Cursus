@@ -10,6 +10,7 @@ Leer hoe je een Unified Namespace (UNS) opzet met [UMH Core](https://www.umh.app
 |--------|-----------|--------|
 | [Sessie 1](sessie-1/) | Introductie UMH & Unified Namespace | Beschikbaar |
 | [Sessie 2](sessie-2/) | MQTT ingestie, TimescaleDB & Grafana | Beschikbaar |
+| [Sessie 3](sessie-3/) | OPC UA, Modbus & Industriele Protocollen | Beschikbaar |
 
 ## Wat heb je nodig?
 
