@@ -1,0 +1,22 @@
+Node ID,Location Path Suffix,Data Contract,Virtual Path,Tag Name,Unit
+ns=1;i=1,,_deburring_machine_v1,,state,raw
+ns=1;i=2,,_deburring_machine_v1,,cycle_count,raw
+ns=1;i=3,,_deburring_machine_v1,,good_count,raw
+ns=1;i=4,,_deburring_machine_v1,,scrap_count,raw
+ns=1;i=5,,_deburring_machine_v1,,cycle_time_ms,ms
+ns=1;i=6,,_deburring_machine_v1,,blocked_by_buffer,raw
+ns=1;i=7,,_deburring_machine_v1,,brush_speed_rpm,RPM
+ns=1;i=8,,_deburring_machine_v1,,contact_pressure_bar,bar
+ns=1;i=9,,_deburring_machine_v1,,feed_rate_mm_s,mm/s
+ns=1;i=10,,_deburring_machine_v1,,surface_finish_ra_um,um Ra
+ns=1;i=11,,_deburring_machine_v1,,material_removal_mm,mm
+ns=1;i=12,,_deburring_machine_v1,,brush_wear_pct,%
+ns=1;i=13,,_deburring_machine_v1,,power_consumption_kw,kW
+ns=1;i=14,,_deburring_machine_v1,,vibration_mm_s,mm/s
+ns=1;i=15,,_deburring_machine_v1,,coolant_flow_l_min,L/min
+ns=1;i=16,,_deburring_machine_v1,,dust_extraction_m3_h,m3/h
+ns=1;i=17,,_deburring_machine_v1,,part_temp_c,°C
+ns=1;i=18,,_deburring_machine_v1,,spindle_current_a,A
+ns=1;i=19,,_deburring_machine_v1,,burr_height_before_um,um
+ns=1;i=20,,_deburring_machine_v1,,burr_height_after_um,um
+ns=1;i=21,,_deburring_machine_v1,,cycle_count_brush,raw

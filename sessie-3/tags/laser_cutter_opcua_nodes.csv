@@ -1,0 +1,22 @@
+Node ID,Location Path Suffix,Data Contract,Virtual Path,Tag Name,Unit
+ns=1;i=1,,_laser_cutter_v1,,state,raw
+ns=1;i=2,,_laser_cutter_v1,,cycle_count,raw
+ns=1;i=3,,_laser_cutter_v1,,good_count,raw
+ns=1;i=4,,_laser_cutter_v1,,scrap_count,raw
+ns=1;i=5,,_laser_cutter_v1,,cycle_time_ms,ms
+ns=1;i=6,,_laser_cutter_v1,,blocked_by_buffer,raw
+ns=1;i=7,,_laser_cutter_v1,,laser_power_w,W
+ns=1;i=8,,_laser_cutter_v1,,cutting_speed_mm_s,mm/s
+ns=1;i=9,,_laser_cutter_v1,,assist_gas_pressure_bar,bar
+ns=1;i=10,,_laser_cutter_v1,,focal_point_mm,mm
+ns=1;i=11,,_laser_cutter_v1,,kerf_width_mm,mm
+ns=1;i=12,,_laser_cutter_v1,,beam_quality_mm_mrad,mm*mrad
+ns=1;i=13,,_laser_cutter_v1,,nozzle_standoff_mm,mm
+ns=1;i=14,,_laser_cutter_v1,,pierce_time_ms,ms
+ns=1;i=15,,_laser_cutter_v1,,sheet_temp_c,°C
+ns=1;i=16,,_laser_cutter_v1,,exhaust_flow_m3_h,m3/h
+ns=1;i=17,,_laser_cutter_v1,,lens_condition_pct,%
+ns=1;i=18,,_laser_cutter_v1,,gas_consumption_l_min,L/min
+ns=1;i=19,,_laser_cutter_v1,,edge_roughness_um,um
+ns=1;i=20,,_laser_cutter_v1,,taper_angle_deg,deg
+ns=1;i=21,,_laser_cutter_v1,,power_stability_pct,%
