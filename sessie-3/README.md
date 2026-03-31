@@ -310,8 +310,102 @@ Kun je externe sensoren plaatsen?
 - [MTConnect](https://www.mtconnect.org/) — open CNC protocol
 - [IFM IO-Link](https://www.ifm.com/de/en/category/200_010_010) — industriele IoT sensoren
 
+## Cursus Simulators
+
+De cursus heeft 5 simulators beschikbaar op een cloud server. Je krijgt het IP-adres tijdens de les.
+
+### Verbindingsoverzicht
+
+| Protocol | Poort | Verbinding | Beschrijving |
+|----------|-------|------------|--------------|
+| **MQTT** | 1883 | `tcp://<CURSUS-SERVER>:1883` — geen auth | MetalFab fabriekssimulator (laser, kantbank, robots) |
+| **OPC-UA** | 4840-4853 | `opc.tcp://<CURSUS-SERVER>:4840` — anonymous | 14 gesimuleerde machines (plaatwerk, automotive, elektronica) |
+| **Modbus TCP** | 5020 | `<CURSUS-SERVER>:5020` — Slave ID 1 | Zonne-omvormer simulator |
+| **HTTP REST** | 8084 | `GET http://<CURSUS-SERVER>:8084/api/weather/current` | Weer simulator |
+| **HTTP REST** | 8085 | `GET http://<CURSUS-SERVER>:8085/api/energy/current` | Energieprijs simulator (spotmarkt) |
+
+### MQTT — MetalFab Fabriek
+
+Publiceer op `umh/v1/metalfab/#`. Bevat laser cutters, kantbanken en robots met tags als `laser_power`, `cutting_speed`, `tonnage`, `bend_angle`.
+
+```bash
+# Test met MQTT Explorer of mosquitto_sub
+mosquitto_sub -h <CURSUS-SERVER> -p 1883 -t "umh/v1/metalfab/#" -v
+```
+
+### OPC-UA — Machine Simulator
+
+14 machines op poorten 4840-4853. Elke poort is een andere machine. Verbind via UMH Management Console → Protocol Converter → OPC-UA.
+
+- Security Mode: **None**
+- Authentication: **Anonymous**
+- Poort 4840: Eerste machine (metaalvorming)
+- Poort 4841: Tweede machine (lasser)
+- etc.
+
+### Modbus TCP — Zonne-omvormer
+
+Simuleert een zonne-omvormer met realistische dagcurve (nul 's nachts, piek rond 12:00, wolkendips).
+
+| Register | Parameter | Eenheid | Datatype |
+|----------|-----------|---------|----------|
+| 0 | DC Vermogen | W | Float32 (2 registers) |
+| 2 | AC Vermogen | W | Float32 |
+| 4 | Dagopbrengst | kWh | Float32 |
+| 8 | DC Spanning | V | Float32 |
+| 10 | DC Stroom | A | Float32 |
+| 12 | Paneel Temperatuur | °C | Float32 |
+| 14 | Omvormer Status | enum (0=uit, 1=opstart, 2=productie, 3=storing) | Float32 |
+| 16 | Netfrequentie | Hz | Float32 |
+
+Configuratie in UMH: Protocol Converter → Modbus TCP, polling elke 5 seconden.
+
+### HTTP REST — Weer & Energieprijzen
+
+**Weer** (`/api/weather/current`):
+```json
+{
+  "temperature_c": 18.5,
+  "humidity_pct": 62,
+  "cloud_cover_pct": 35,
+  "solar_irradiance_wm2": 650,
+  "wind_speed_kmh": 12.3,
+  "pressure_hpa": 1013.2,
+  "condition": "partly_cloudy",
+  "uv_index": 4
+}
+```
+
+**Energieprijzen** (`/api/energy/current`):
+```json
+{
+  "price_eur_mwh": 85.30,
+  "price_eur_kwh": 0.0853,
+  "zone": "NL",
+  "trend": "rising",
+  "day_average_eur_mwh": 72.50,
+  "peak_price_eur_mwh": 125.00,
+  "off_peak_price_eur_mwh": 45.00
+}
+```
+
+Configuratie in UMH: Stand-alone DataFlow met `http_client` input of `generate` + `http` processor.
+
+### Lokale UMH Stack
+
+| Service | Poort | Toegang |
+|---------|-------|---------|
+| UMH Management Console | 8443 | `https://localhost:8443` |
+| Grafana | 3000 | `http://localhost:3000` |
+| TimescaleDB | 5432 | `localhost:5432` |
+| HiveMQ MQTT | 1883 | `localhost:1883` |
+| Node-RED | 1880 | `http://localhost:1880` |
+
+---
+
 ## Voorbereiding
 
-1. Lees de Modbus registers van een apparaat in je netwerk (of gebruik een simulator)
-2. Bekijk de OPC UA nodes van een testserver (bijv. `opc.tcp://opcuademo.sterfive.com:26543`)
-3. Bedenk: welke machines in jouw fabriek hebben welk protocol?
+1. Stack draaiend (`docker compose up -d`)
+2. Verbind met de cursus MQTT broker via MQTT Explorer
+3. Bekijk de OPC-UA server via UMH Management Console
+4. Bedenk: welke machines in jouw fabriek hebben welk protocol?
