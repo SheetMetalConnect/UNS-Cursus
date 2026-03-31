@@ -1,0 +1,127 @@
+# ==============================================================================
+# UNS Cursus — Docker Compose Stack
+# ==============================================================================
+# UMH Core + TimescaleDB + Grafana + HiveMQ + Node-RED + Portainer
+#
+# Starten:  docker compose up -d
+# Stoppen:  docker compose down
+# Wissen:   docker compose down -v   (verwijdert alle data!)
+#
+# Vereist:
+#   - Docker Desktop
+#   - AUTH_TOKEN van https://management.umh.app/ (gratis account)
+# ==============================================================================
+
+services:
+  umh:
+    image: management.umh.app/oci/united-manufacturing-hub/umh-core:v0.44.11
+    container_name: umh-core
+    restart: unless-stopped
+    volumes:
+      - umh-core-data:/data
+    environment:
+      - AUTH_TOKEN=${AUTH_TOKEN:?Maak een .env bestand met AUTH_TOKEN=<jouw-token>}
+      - RELEASE_CHANNEL=stable
+      - LOCATION_0=${LOCATION_0:-mijnbedrijf}
+      - LOCATION_1=${LOCATION_1:-mijnsite}
+      - API_URL=https://management.umh.app/api
+      - DB_DSN=postgres://kafkatopostgresqlv2:umhcore@timescaledb:5432/umh?sslmode=disable
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:8080/api/v1/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  timescaledb:
+    image: management.umh.app/oci/timescale/timescaledb:2.24.0-pg17
+    container_name: timescaledb
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB=umh
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=changeme
+      - TIMESCALEDB_TELEMETRY=off
+    volumes:
+      - timescaledb-data:/var/lib/postgresql/data
+      - ./configs/timescaledb-init:/docker-entrypoint-initdb.d:ro
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h timescaledb"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  grafana:
+    image: management.umh.app/oci/grafana/grafana:12.3.0
+    container_name: grafana
+    restart: unless-stopped
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=changeme
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./configs/grafana/provisioning:/etc/grafana/provisioning:ro
+    ports:
+      - "3000:3000"
+    healthcheck:
+      test: ["CMD-SHELL", "curl --fail http://grafana:3000/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    depends_on:
+      timescaledb:
+        condition: service_healthy
+
+  hivemq:
+    image: docker.io/hivemq/hivemq-ce:latest
+    container_name: hivemq
+    restart: unless-stopped
+    environment:
+      - HIVEMQ_ALLOW_ALL_CLIENTS=true
+      - JAVA_OPTS=-Xmx512m -Xms256m
+    ports:
+      - "1883:1883"
+      - "8083:8000"
+    volumes:
+      - hivemq-data:/opt/hivemq/data
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'exec 3<>/dev/tcp/127.0.0.1/1883'"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  nodered:
+    image: docker.io/nodered/node-red:latest
+    container_name: nodered
+    restart: unless-stopped
+    environment:
+      - TZ=Europe/Amsterdam
+    ports:
+      - "1880:1880"
+    volumes:
+      - nodered-data:/data
+
+  portainer:
+    image: docker.io/portainer/portainer-ce:latest
+    container_name: portainer
+    restart: unless-stopped
+    ports:
+      - "9000:9000"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - portainer-data:/data
+
+networks:
+  default:
+    name: umh-network
+
+volumes:
+  umh-core-data: {}
+  timescaledb-data: {}
+  grafana-data: {}
+  hivemq-data: {}
+  nodered-data: {}
+  portainer-data: {}
