@@ -358,9 +358,21 @@ Simuleert een zonne-omvormer met realistische dagcurve (nul 's nachts, piek rond
 | 14 | Omvormer Status | enum (0=uit, 1=opstart, 2=productie, 3=storing) | Float32 |
 | 16 | Netfrequentie | Hz | Float32 |
 
-Configuratie in UMH: Protocol Converter → Modbus TCP, polling elke 5 seconden.
+**Configuratie in UMH:**
+
+Modbus kan op twee manieren worden geconfigureerd:
+
+1. **Protocol Converter (Bridge wizard)** — via Management Console → Data Flows → Add Bridge → Modbus. Dit is de standaard methode en werkt goed op een lokaal netwerk (bijv. PLC op de werkvloer).
+
+2. **Stand-alone DataFlow** — via Management Console → Data Flows → Stand-alone → Add. Gebruik dit als de Bridge wizard een connectietest-fout geeft (bijv. bij verbinding over internet). De Benthos `modbus` input werkt direct zonder connectietest.
+
+> **Let op:** De Bridge wizard doet een nmap-connectietest voordat hij de bridge deployt. Bij Modbus over internet kan deze test falen ("connection is degraded"), terwijl de daadwerkelijke Modbus-communicatie prima werkt. Gebruik in dat geval een stand-alone dataflow.
+
+Zie `flows/modbus-solar-bridge.yaml` voor de volledige configuratie.
 
 ### HTTP REST — Weer & Energieprijzen
+
+HTTP APIs worden geconfigureerd als **Protocol Converter** met een `generate` input (voor polling interval) en een `http` processor om de data op te halen. De tag processor splitst de JSON response in losse UNS tags.
 
 **Weer** (`/api/weather/current`):
 ```json
@@ -389,7 +401,20 @@ Configuratie in UMH: Protocol Converter → Modbus TCP, polling elke 5 seconden.
 }
 ```
 
-Configuratie in UMH: Stand-alone DataFlow met `http_client` input of `generate` + `http` processor.
+Configuratie in UMH: Protocol Converter met `generate` input (interval) + `http` processor + `tag_processor`. Zie `flows/stroomkosten.yaml` en `flows/weather-bridge.yaml` voor werkende voorbeelden.
+
+### Alle bridges in `flows/`
+
+| Bestand | Protocol | Type | Beschrijving |
+|---------|----------|------|--------------|
+| `laser-demonstratie.yaml` | OPC-UA | Protocol Converter | Laser cutter via OPC-UA bridge wizard |
+| `ontbraam.yaml` | OPC-UA | Protocol Converter | Ontbraammachine via OPC-UA bridge wizard |
+| `stroomkosten.yaml` | HTTP | Protocol Converter | Energieprijzen API polling |
+| `mqtt-metalfab.yaml` | MQTT | Stand-alone DataFlow | MetalFab fabriekssimulator |
+| `weather-bridge.yaml` | HTTP | Stand-alone DataFlow | Weer API polling |
+| `energy-price-bridge.yaml` | HTTP | Stand-alone DataFlow | Energieprijzen API (alternatief) |
+| `modbus-solar-bridge.yaml` | Modbus TCP | Stand-alone DataFlow | Zonne-omvormer registers |
+| `historian.yaml` | UNS → SQL | Stand-alone DataFlow | Alle `_raw` data → TimescaleDB |
 
 ### Lokale UMH Stack
 
