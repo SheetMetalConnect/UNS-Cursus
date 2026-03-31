@@ -27,13 +27,20 @@ CREATE TABLE IF NOT EXISTS asset (
     location VARCHAR(500),
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    enterprise TEXT NOT NULL DEFAULT '',
-    site TEXT NOT NULL DEFAULT '',
-    area TEXT NOT NULL DEFAULT '',
-    line TEXT NOT NULL DEFAULT '',
-    workcell TEXT NOT NULL DEFAULT '',
-    origin_id TEXT NOT NULL DEFAULT ''
+    enterprise TEXT,
+    site TEXT,
+    area TEXT,
+    line TEXT,
+    workcell TEXT,
+    origin_id TEXT
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS asset_hierarchy_key
-  ON asset(enterprise, site, area, line, workcell, origin_id);
+  ON asset(
+    COALESCE(enterprise, ''),
+    COALESCE(site, ''),
+    COALESCE(area, ''),
+    COALESCE(line, ''),
+    COALESCE(workcell, ''),
+    COALESCE(origin_id, '')
+  );
