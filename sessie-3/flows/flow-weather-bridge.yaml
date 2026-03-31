@@ -1,0 +1,27 @@
+input:
+  generate:
+    interval: 30s
+    mapping: root = ""
+pipeline:
+  processors:
+  - http:
+      url: http://<CURSUS-SERVER>:8084/api/weather/current
+      verb: GET
+  - bloblang: "let data = this\nroot = [\n  {\"tag\": \"temperature_c\", \"v\": $data.temperature_c},\n\
+      \  {\"tag\": \"humidity_pct\", \"v\": $data.humidity_pct},\n  {\"tag\": \"wind_speed_kmh\"\
+      , \"v\": $data.wind_speed_kmh},\n  {\"tag\": \"cloud_cover_pct\", \"v\": $data.cloud_cover_pct},\n\
+      \  {\"tag\": \"solar_irradiance_wm2\", \"v\": $data.solar_irradiance_wm2},\n\
+      \  {\"tag\": \"pressure_hpa\", \"v\": $data.pressure_hpa},\n  {\"tag\": \"uv_index\"\
+      , \"v\": $data.uv_index}\n]\n"
+  - unarchive:
+      format: json_array
+  - bloblang: 'meta umh_topic = "umh.v1.smc.workshop.environment.weather._raw." +
+      this.tag
+
+      root.value = this.v
+
+      root.timestamp_ms = now().ts_unix_milli()
+
+      '
+output:
+  uns: {}

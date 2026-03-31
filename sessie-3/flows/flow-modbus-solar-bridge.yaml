@@ -1,0 +1,63 @@
+input:
+  modbus:
+    addresses:
+    - address: 0
+      length: 2
+      name: dc_power_w
+      type: holding
+    - address: 2
+      length: 2
+      name: ac_power_w
+      type: holding
+    - address: 4
+      length: 2
+      name: daily_yield_kwh
+      type: holding
+    - address: 8
+      length: 2
+      name: dc_voltage_v
+      type: holding
+    - address: 10
+      length: 2
+      name: dc_current_a
+      type: holding
+    - address: 12
+      length: 2
+      name: panel_temperature_c
+      type: holding
+    - address: 14
+      length: 2
+      name: inverter_status
+      type: holding
+    - address: 16
+      length: 2
+      name: grid_frequency_hz
+      type: holding
+    byteOrder: ABCD
+    controller: tcp://<CURSUS-SERVER>:5020
+    slaveIDs:
+    - 1
+    timeBetweenReads: 5s
+    timeout: 3s
+    transmissionMode: TCP
+pipeline:
+  processors:
+  - bloblang: "let data = this\nroot = [\n  {\"tag\": \"dc_power_w\", \"v\": $data.dc_power_w.catch(null)},\n\
+      \  {\"tag\": \"ac_power_w\", \"v\": $data.ac_power_w.catch(null)},\n  {\"tag\"\
+      : \"daily_yield_kwh\", \"v\": $data.daily_yield_kwh.catch(null)},\n  {\"tag\"\
+      : \"dc_voltage_v\", \"v\": $data.dc_voltage_v.catch(null)},\n  {\"tag\": \"\
+      dc_current_a\", \"v\": $data.dc_current_a.catch(null)},\n  {\"tag\": \"panel_temperature_c\"\
+      , \"v\": $data.panel_temperature_c.catch(null)},\n  {\"tag\": \"inverter_status\"\
+      , \"v\": $data.inverter_status.catch(null)},\n  {\"tag\": \"grid_frequency_hz\"\
+      , \"v\": $data.grid_frequency_hz.catch(null)}\n].filter(item -> item.v != null)\n"
+  - unarchive:
+      format: json_array
+  - bloblang: 'meta umh_topic = "umh.v1.smc.workshop.energy.solar._raw." + this.tag
+
+      root.value = this.v
+
+      root.timestamp_ms = now().ts_unix_milli()
+
+      '
+output:
+  uns: {}
