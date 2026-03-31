@@ -1,0 +1,56 @@
+# ============================================================
+# modbus-solar-bridge (Standalone DataFlow)
+# ============================================================
+
+# ── INPUT ──────────────────────────────────────────────────
+input:
+  modbus:
+    addresses:
+    - address: 0
+      name: dc_power_w
+      type: FLOAT32
+    - address: 2
+      name: ac_power_w
+      type: FLOAT32
+    - address: 4
+      name: daily_yield_kwh
+      type: FLOAT32
+    - address: 8
+      name: dc_voltage_v
+      type: FLOAT32
+    - address: 10
+      name: dc_current_a
+      type: FLOAT32
+    - address: 12
+      name: panel_temperature_c
+      type: FLOAT32
+    - address: 14
+      name: inverter_status
+      type: UINT32
+    - address: 16
+      name: grid_frequency_hz
+      type: FLOAT32
+    byteOrder: ABCD
+    controller: tcp://<CURSUS-SERVER>:5020
+    slaveIDs:
+    - 1
+    timeBetweenReads: 5s
+    timeout: 3s
+    transmissionMode: TCP
+
+# ── PROCESSING ─────────────────────────────────────────────
+pipeline:
+  processors:
+  - bloblang: 'let tag = meta("modbus_tag_name").or("unknown")
+
+      meta umh_topic = "umh.v1.smc.workshop.energy.solar._raw." + $tag
+
+      root.value = content().string().number().catch(content().string())
+
+      root.timestamp_ms = now().ts_unix_milli()
+
+      '
+
+# ── OUTPUT ─────────────────────────────────────────────────
+output:
+  uns: {}

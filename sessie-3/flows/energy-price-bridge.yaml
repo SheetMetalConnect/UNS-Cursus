@@ -1,7 +1,14 @@
+# ============================================================
+# energy-price-bridge (Standalone DataFlow)
+# ============================================================
+
+# ── INPUT ──────────────────────────────────────────────────
 input:
   generate:
     interval: 60s
     mapping: root = ""
+
+# ── PROCESSING ─────────────────────────────────────────────
 pipeline:
   processors:
   - http:
@@ -21,5 +28,7 @@ pipeline:
       root.timestamp_ms = now().ts_unix_milli()
 
       '
+
+# ── OUTPUT ─────────────────────────────────────────────────
 output:
   uns: {}
