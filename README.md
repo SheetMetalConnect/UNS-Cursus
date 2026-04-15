@@ -1,55 +1,47 @@
 # UNS Cursus — Unified Namespace voor de Maakindustrie
 
-Lesmateriaal voor de UNS cursus van [SheetMetalConnect](https://github.com/SheetMetalConnect).
+Lesmateriaal voor de UNS cursus van [SheetMetalConnect](https://sheetmetalconnect.com).
 
-Leer hoe je een Unified Namespace (UNS) opzet met [UMH Core](https://www.umh.app/) — van MQTT sensoren tot Grafana dashboards.
+Leer hoe je een Unified Namespace (UNS) opzet met [UMH Core](https://www.umh.app/) — van sensoren tot dashboards.
 
 ## Sessies
 
 | Sessie | Onderwerp | Status |
 |--------|-----------|--------|
 | [Sessie 1](sessie-1/) | Introductie UMH & Unified Namespace | Beschikbaar |
-| [Sessie 2](sessie-2/) | MQTT ingestie, TimescaleDB & Grafana | Beschikbaar |
+| [Sessie 2](sessie-2/) | Docker, TimescaleDB & Grafana | Beschikbaar |
 | [Sessie 3](sessie-3/) | OPC UA, Modbus & Industriele Protocollen | Beschikbaar |
+| [Sessie 4](sessie-4/) | Grafana Dashboards & ERP-integratie | Beschikbaar |
+| [Sessie 5](sessie-5/) | Binnenkort | |
+| [Sessie 6](sessie-6/) | Binnenkort | |
 
 ## Wat heb je nodig?
 
-- Docker Desktop ([download](https://www.docker.com/products/docker-desktop/))
-- DBeaver Community ([download](https://dbeaver.io/download/))
-- MQTT Explorer ([download](https://mqtt-explorer.com/)) — optioneel
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/)
+- [DBeaver Community](https://dbeaver.io/download/)
 - Een teksteditor (VS Code, Notepad++, etc.)
 
-## Stack overzicht
+## Stack
 
-De cursus gebruikt een Docker Compose stack met:
+De cursus gebruikt een Docker Compose stack:
 
-| Component | Doel |
-|-----------|------|
-| [UMH Core](https://docs.umh.app/) | Unified Namespace hub (Redpanda + dataFlows) |
-| [TimescaleDB](https://www.timescale.com/) | Tijdreeks database (PostgreSQL + hypertables) |
-| [Grafana](https://grafana.com/) | Dashboards & visualisatie |
-| [HiveMQ CE](https://www.hivemq.com/community/) | MQTT broker |
-| [Node-RED](https://nodered.org/) | Flow-based programming |
-
-## Snel starten
+| Component | Doel | Poort |
+|-----------|------|-------|
+| [UMH Core](https://docs.umh.app/) | UNS hub (Redpanda + dataflows) | — |
+| [TimescaleDB](https://www.timescale.com/) | Tijdreeks database | 5432 |
+| [Grafana](https://grafana.com/) | Dashboards | 3000 |
+| [HiveMQ CE](https://www.hivemq.com/community/) | MQTT broker | 1883 |
+| [Node-RED](https://nodered.org/) | Flow-based programming | 1880 |
 
 ```bash
-git clone https://github.com/SheetMetalConnect/UNS-Cursus.git
-cd UNS-Cursus
+cd stack
+cp .env.example .env   # vul AUTH_TOKEN in
+docker compose up -d
 ```
 
-Volg de instructies per sessie.
+## Simulator
 
-## Online MQTT broker (cursus)
-
-De cursus-simulator draait 24/7:
-
-```
-Broker: <cloud-broker>:1883 (geen login nodig)
-Topic:  umh/v1/metalfab/#
-```
-
-Verbind met MQTT Explorer of Node-RED om live fabrieksdata te bekijken.
+De `simulator/` map bevat een MetalFab fabriekssimulator met MQTT, OPC-UA, Modbus en HTTP API databronnen. Zie `simulator/README.md` voor instructies.
 
 ## Licentie
 

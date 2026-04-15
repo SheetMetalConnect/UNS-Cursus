@@ -1,0 +1,61 @@
+{
+  "uid": "werkorders",
+  "title": "Werkorders",
+  "tags": ["sessie-4", "erp"],
+  "timezone": "Europe/Amsterdam",
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Aantal orders",
+      "gridPos": {"h": 4, "w": 4, "x": 0, "y": 0},
+      "targets": [{"rawSql": "SELECT count(*) AS \"Orders\" FROM production_orders;", "format": "table"}],
+      "datasource": {"type": "grafana-postgresql-datasource", "uid": "umh-timescaledb"},
+      "fieldConfig": {"defaults": {"thresholds": {"steps": [{"color": "blue", "value": null}]}}}
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Totaal gepland",
+      "gridPos": {"h": 4, "w": 4, "x": 4, "y": 0},
+      "targets": [{"rawSql": "SELECT sum(quantity) AS \"Gepland\" FROM production_orders;", "format": "table"}],
+      "datasource": {"type": "grafana-postgresql-datasource", "uid": "umh-timescaledb"},
+      "fieldConfig": {"defaults": {"thresholds": {"steps": [{"color": "green", "value": null}]}}}
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Totaal gereed",
+      "gridPos": {"h": 4, "w": 4, "x": 8, "y": 0},
+      "targets": [{"rawSql": "SELECT COALESCE(sum(quantity_completed), 0) AS \"Gereed\" FROM production_orders;", "format": "table"}],
+      "datasource": {"type": "grafana-postgresql-datasource", "uid": "umh-timescaledb"},
+      "fieldConfig": {"defaults": {"thresholds": {"steps": [{"color": "orange", "value": null}]}}}
+    },
+    {
+      "id": 4,
+      "type": "piechart",
+      "title": "Status verdeling",
+      "gridPos": {"h": 8, "w": 6, "x": 12, "y": 0},
+      "targets": [{"rawSql": "SELECT status, count(*) AS aantal FROM production_orders GROUP BY status;", "format": "table"}],
+      "datasource": {"type": "grafana-postgresql-datasource", "uid": "umh-timescaledb"}
+    },
+    {
+      "id": 5,
+      "type": "table",
+      "title": "Alle werkorders",
+      "gridPos": {"h": 12, "w": 12, "x": 0, "y": 4},
+      "targets": [{"rawSql": "SELECT po.order_id AS \"Order\", a.line AS \"Machine\", po.part_number AS \"Product\", po.customer AS \"Klant\", po.priority AS \"Prioriteit\", po.quantity AS \"Gepland\", po.quantity_completed AS \"Gereed\", po.quantity_scrap AS \"Uitval\", po.status AS \"Status\", po.updated_at AS \"Laatst bijgewerkt\" FROM production_orders po JOIN asset a ON a.id = po.asset_id ORDER BY po.order_id;", "format": "table"}],
+      "datasource": {"type": "grafana-postgresql-datasource", "uid": "umh-timescaledb"}
+    },
+    {
+      "id": 6,
+      "type": "barchart",
+      "title": "Productie per lijn",
+      "gridPos": {"h": 8, "w": 6, "x": 12, "y": 8},
+      "targets": [{"rawSql": "SELECT a.line AS \"Lijn\", sum(po.quantity) AS \"Gepland\", COALESCE(sum(po.quantity_completed), 0) AS \"Gereed\" FROM production_orders po JOIN asset a ON a.id = po.asset_id GROUP BY a.line ORDER BY \"Gepland\" DESC;", "format": "table"}],
+      "datasource": {"type": "grafana-postgresql-datasource", "uid": "umh-timescaledb"}
+    }
+  ],
+  "schemaVersion": 39,
+  "version": 1
+}

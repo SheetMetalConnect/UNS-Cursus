@@ -1,34 +1,34 @@
-# ==============================================================================
-# Historian Flow — UNS _raw → TimescaleDB
-# ==============================================================================
+# =============================================================================
+# Historian Flow — UNS → TimescaleDB
+# =============================================================================
 #
-# Schrijft alle _raw data uit de UNS naar TimescaleDB:
-#   - Numerieke waarden (temperature, power, voltage)  → tag tabel
-#   - Tekst waarden (state_name = "EXECUTE")           → tag_string tabel
+# Luistert naar alle _raw berichten in de UNS en schrijft ze naar TimescaleDB.
+# Numerieke waarden → tabel 'tag', tekst → tabel 'tag_string'.
 #
-# Deploy via Management Console → Data Flows → Stand-alone → Add:
+# Deploy als: Standalone flow in Management Console
+# Vereist:    DB_DSN env var op UMH Core (staat in docker-compose.yaml)
 #
-#   INPUT veld:      kopieer alles van "input:" t/m "consumer_group: historian-v2"
-#   PROCESSING veld: kopieer alles van "pipeline:" t/m "} else { $val }"
-#   OUTPUT veld:     kopieer alles van "output:" t/m het einde
-#
-# Vereist:
-#   - get_asset_id() functie in TimescaleDB (sessie2/sql/03-create-function.sql)
-#   - DB_DSN env var in UMH Core (docker-compose.yaml)
-# ==============================================================================
+# Topic pattern: umh.v1.<enterprise>.<site>.<area>.<line>._raw.<tag_name>
+# Voorbeeld:     umh.v1.smc.workshop.laser._raw.laser_power_w
+# =============================================================================
 
 input:
   uns:
-    umh_topic: "umh\\.v1\\..+\\._raw\\..+"
-    consumer_group: historian-v2
+    consumer_group: historian
+    umh_topic: umh\.v1\..+\._raw\..+
 
 pipeline:
   processors:
+
+    # --- Stap 1: Topic ontleden naar ISA-95 hiërarchie ---
+    # Zoekt de positie van '_raw' in het topic en splitst:
+    #   - Links van _raw  → locatie (enterprise, site, area, line, workcell)
+    #   - Rechts van _raw → tag_name
     - bloblang: |
         let umh_topic = meta("umh_topic")
         let parts = $umh_topic.split(".")
 
-        # Find _raw position by scanning (bloblang index() is numeric only)
+        # Zoek _raw positie (max 10 niveaus diep)
         let raw_idx = -1
         let raw_idx = if $parts.index(0).catch("") == "_raw" { 0 } else { $raw_idx }
         let raw_idx = if $parts.index(1).catch("") == "_raw" { 1 } else { $raw_idx }
@@ -41,53 +41,63 @@ pipeline:
         let raw_idx = if $parts.index(8).catch("") == "_raw" { 8 } else { $raw_idx }
         let raw_idx = if $parts.index(9).catch("") == "_raw" { 9 } else { $raw_idx }
 
+        # Geen _raw gevonden → bericht weggooien
         root = if $raw_idx < 0 { deleted() } else { this }
 
-        # Location: everything between "v1" (index 1) and "_raw"
+        # Locatie = alles tussen "umh.v1." en "_raw"
         let loc_parts = $parts.slice(2, $raw_idx)
-
-        # Tag name: everything after _raw, joined with dots
+        # Tag = alles na "_raw"
         let tag_parts = $parts.slice($raw_idx + 1)
-        meta tag_name = $tag_parts.join(".")
 
-        # ISA-95 hierarchy (6 levels for get_asset_id)
+        meta tag_name   = $tag_parts.join(".")
         meta enterprise = $loc_parts.index(0).catch("")
-        meta site = $loc_parts.index(1).catch("")
-        meta area = $loc_parts.index(2).catch("")
-        meta line = $loc_parts.index(3).catch("")
-        meta workcell = $loc_parts.index(4).catch("")
-        meta origin_id = $loc_parts.index(5).catch("")
+        meta site       = $loc_parts.index(1).catch("")
+        meta area       = $loc_parts.index(2).catch("")
+        meta line       = $loc_parts.index(3).catch("")
+        meta workcell   = $loc_parts.index(4).catch("")
+        meta origin_id  = $loc_parts.index(5).catch("")
 
+    # --- Stap 2: Waarde-type detectie ---
+    # Bepaalt of de waarde numeriek of tekst is.
+    # Booleans worden omgezet naar 0/1.
     - bloblang: |
         let val = this.value.catch(this)
         let is_numeric = $val.type() == "number" || $val.type() == "bool" || ($val.type() == "string" && $val.re_match("^-?[0-9]+(\\.[0-9]+)?$"))
+
         meta is_numeric = if $is_numeric { "true" } else { "false" }
+
         root.tag_name = meta("tag_name")
-        # Cast bool → 0/1 so .number() doesn't fail
         root.value = if $val.type() == "bool" { if $val { 1 } else { 0 } } else { $val }
 
 output:
   switch:
     cases:
+      # Numerieke waarden → tag tabel
       - check: meta("is_numeric") == "true"
         output:
           sql_raw:
             driver: postgres
             dsn: ${DB_DSN}
-            query: |
+            query: >
               INSERT INTO tag (time, asset_id, tag_name, value, origin)
               VALUES (NOW(), get_asset_id($1, $2, $3, $4, $5, $6), $7, $8, 'uns')
             args_mapping: |
-              [ meta("enterprise"), meta("site"), meta("area"), meta("line"), meta("workcell"), meta("origin_id"), this.tag_name, this.value.number() ]
+              [ meta("enterprise"), meta("site"), meta("area"), meta("line"),
+                meta("workcell"), meta("origin_id"), this.tag_name, this.value.number() ]
             max_in_flight: 64
 
+      # Tekst waarden → tag_string tabel
       - output:
           sql_raw:
             driver: postgres
             dsn: ${DB_DSN}
-            query: |
+            query: >
               INSERT INTO tag_string (time, asset_id, tag_name, value, origin)
               VALUES (NOW(), get_asset_id($1, $2, $3, $4, $5, $6), $7, $8, 'uns')
             args_mapping: |
-              [ meta("enterprise"), meta("site"), meta("area"), meta("line"), meta("workcell"), meta("origin_id"), this.tag_name, this.value.string() ]
+              [ meta("enterprise"), meta("site"), meta("area"), meta("line"),
+                meta("workcell"), meta("origin_id"), this.tag_name, this.value.string() ]
             max_in_flight: 64
+
+buffer:
+  none: {}

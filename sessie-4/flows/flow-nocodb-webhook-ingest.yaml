@@ -1,0 +1,36 @@
+# Sessie 4 — Standalone flow: NocoDB webhook → UNS
+# Ontvangt HTTP POST van NocoDB webhook, publiceert naar _raw topic
+# Deploy via: Management Console → Data Flows → Stand-alone → Add
+#
+# Let op: gebruikt poort 8092 (niet 8090, die is voor de werkorder API)
+# Voeg port 8092:8092 toe aan umh-core in docker-compose.yaml
+#
+# NocoDB webhook instellen:
+#   URL: http://umh-core:8092/webhook/nocodb
+#   Event: After Record Insert
+#   Method: POST, Request Type: JSON
+#   Body: {{ json data }}
+#
+# NocoDB vereist NC_ALLOW_LOCAL_HOOKS=true om naar private IPs te posten
+
+input:
+  http_server:
+    address: 0.0.0.0:8092
+    path: /webhook/nocodb
+    allowed_verbs: [POST]
+
+pipeline:
+  processors:
+    - bloblang: |
+        # NocoDB webhook payload: {data: {rows: [{order_nr: ..., asset: ..., qty: ..., status: ...}]}}
+        let rows = this.data.rows.or([])
+        root = if $rows.length() == 0 { deleted() } else { this }
+
+        meta umh_topic = "umh.v1.smc.workshop.ERP.nocodb._raw.werkorder"
+        meta location_path = "ERP.nocodb"
+        meta data_contract = "_raw"
+        meta tag_name = "werkorder"
+        root = $rows.index(0)
+
+output:
+  uns: {}

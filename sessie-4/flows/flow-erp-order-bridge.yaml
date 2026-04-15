@@ -1,0 +1,176 @@
+# Sessie 4 — Standalone flow: UNS _erp.orders → production_orders tabel
+#
+# Wat doet het:
+#   - Luistert op _erp.orders topics in Redpanda
+#   - Resolved asset_id via ISA-95 hiërarchie (met cache)
+#   - Overschrijft production_orders tabel in TimescaleDB op basis van order_id
+#   - Bij conflict op (order_id): volledige overwrite met nieuwste data
+#
+# Vereist:
+#   - flow-api-workorder.yaml (de HTTP ingest)
+#   - production_orders tabel (wordt automatisch aangemaakt via init_statement)
+#
+# Deploy via: Management Console → Data Flows → Stand-alone → Add
+# Deploy NADAT flow-api-workorder.yaml actief is
+
+input:
+  uns:
+    consumer_group: erporderbridgev1
+    umh_topic: ^umh\.v1(?:\.[^.]+){0,8}\._erp\.orders$
+
+pipeline:
+  processors:
+    # Filter alleen _erp.orders topics
+    - bloblang: |
+        let topic = meta("umh_topic")
+        let is_valid = $topic.contains("_erp.orders")
+        root = match {
+          $is_valid => root,
+          _ => deleted()
+        }
+      label: filter_topics
+
+    - bloblang: root = this.catch(deleted())
+      label: validate_json
+
+    # Transform order payload naar DB kolommen
+    - bloblang: |
+        root.timestamp = if this.timestamp_ms != null {
+          (this.timestamp_ms / 1000).ts_format(tz: "UTC")
+        } else {
+          now().ts_format(tz: "UTC")
+        }
+        root.order_id = this.orderId
+        root.customer = this.customer
+        root.part_number = this.partNumber
+        root.part_description = this.partDescription
+        root.quantity = this.quantity
+        root.quantity_completed = this.quantityCompleted.or(0)
+        root.quantity_scrap = this.quantityScrap.or(0)
+        root.priority = this.priority
+        root.status = this.status
+        root.due_date = this.dueDate
+        root.started_at = this.startedAt
+        root.completed_at = this.endedAt
+        root.target_line = this.target_line
+        root.planned_cycle_time_ms = this.planned_cycle_time_ms.or(null)
+      label: transform_order
+
+    # Extract ISA-95 locatie uit UNS topic
+    - bloblang: |
+        let topic = meta("umh_topic")
+        let matches = $topic.re_find_all_object("^umh\\.v1\\.(?P<enterprise>[\\w-]+)(?:\\.(?P<site>[\\w-]*))?(?:\\.(?P<area>[\\w-]*))?(?:\\.(?P<line>[\\w-]*))?(?:\\.(?P<workcell>[\\w-]*))?(?:\\.(?P<origin_id>[\\w-]*))?\\._(?P<contract>[\\w-]+)")
+        let m = if $matches.length() > 0 { $matches.index(0) } else { {} }
+        meta "enterprise" = $m.enterprise.or("")
+        meta "site" = $m.site.or("")
+        meta "area" = if $m.area.or("") != "" { $m.area } else { "shopfloor" }
+        let payload_line = this.target_line.or(this.targetLine).or("")
+        let line_from_topic = $m.line.or("")
+        meta "line" = if $line_from_topic != "" { $line_from_topic } else { $payload_line.lowercase() }
+        meta "workcell" = $m.workcell.or("")
+        meta "origin_id" = $m.origin_id.or("")
+        root = this
+      label: extract_location
+
+    # Asset ID lookup (cache → DB fallback met auto-create)
+    - branch:
+        request_map: root = if this.asset_id == null { "" } else { deleted() }
+        processors:
+          - sql_raw:
+              driver: postgres
+              dsn: ${DB_DSN}
+              unsafe_dynamic_query: true
+              query: |
+                WITH existing AS (
+                  SELECT id FROM public.asset
+                  WHERE enterprise = '${! meta("enterprise") }'
+                    AND site = '${! meta("site").or("")}'
+                    AND area = '${! meta("area").or("")}'
+                    AND line = '${! meta("line").or("")}'
+                    AND workcell = '${! meta("workcell").or("")}'
+                    AND origin_id = '${! meta("origin_id").or("")}'
+                ),
+                inserted AS (
+                  INSERT INTO public.asset (asset_name, enterprise, site, area, line, workcell, origin_id)
+                  SELECT '${! meta("enterprise") }.${! meta("site").or("")}.${! meta("area").or("")}.${! meta("line").or("")}', '${! meta("enterprise") }', '${! meta("site").or("")}', '${! meta("area").or("")}', '${! meta("line").or("")}', '${! meta("workcell").or("")}', '${! meta("origin_id").or("")}'
+                  WHERE NOT EXISTS (SELECT 1 FROM existing)
+                  RETURNING id
+                )
+                SELECT id FROM inserted
+                UNION ALL
+                SELECT id FROM existing
+                LIMIT 1;
+        result_map: root.asset_id = this.index(0).get("id")
+
+cache_resources:
+  - label: erp_asset_id_cache
+    memory:
+      default_ttl: 24h
+      compaction_interval: 60s
+  - label: erp_dedupe_cache
+    memory:
+      default_ttl: 5s
+      compaction_interval: 60s
+
+output:
+  sql_raw:
+    driver: postgres
+    dsn: ${DB_DSN}
+    init_statement: |
+      CREATE TABLE IF NOT EXISTS production_orders (
+        id SERIAL PRIMARY KEY,
+        timestamp TIMESTAMPTZ NOT NULL DEFAULT now(),
+        asset_id INTEGER REFERENCES asset(id),
+        order_id VARCHAR(255) NOT NULL UNIQUE,
+        customer VARCHAR(255),
+        part_number VARCHAR(255),
+        part_description TEXT,
+        quantity INTEGER NOT NULL DEFAULT 0,
+        quantity_completed INTEGER NOT NULL DEFAULT 0,
+        quantity_scrap INTEGER NOT NULL DEFAULT 0,
+        priority INTEGER,
+        status VARCHAR(50) NOT NULL DEFAULT 'CREATED',
+        due_date TIMESTAMPTZ,
+        started_at TIMESTAMPTZ,
+        completed_at TIMESTAMPTZ,
+        planned_cycle_time_ms NUMERIC,
+        created_at TIMESTAMPTZ DEFAULT now(),
+        updated_at TIMESTAMPTZ DEFAULT now()
+      );
+    query: |
+      INSERT INTO production_orders (timestamp, asset_id, order_id, customer, part_number, part_description, quantity, quantity_completed, quantity_scrap, priority, status, due_date, started_at, completed_at, planned_cycle_time_ms)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+      ON CONFLICT (order_id) DO UPDATE SET
+        timestamp = EXCLUDED.timestamp,
+        asset_id = EXCLUDED.asset_id,
+        customer = EXCLUDED.customer,
+        part_number = EXCLUDED.part_number,
+        part_description = EXCLUDED.part_description,
+        quantity = EXCLUDED.quantity,
+        quantity_completed = EXCLUDED.quantity_completed,
+        quantity_scrap = EXCLUDED.quantity_scrap,
+        priority = EXCLUDED.priority,
+        status = EXCLUDED.status,
+        due_date = EXCLUDED.due_date,
+        started_at = EXCLUDED.started_at,
+        completed_at = EXCLUDED.completed_at,
+        planned_cycle_time_ms = EXCLUDED.planned_cycle_time_ms,
+        updated_at = now()
+    args_mapping: |
+      root = [
+        this.timestamp,
+        this.asset_id,
+        this.order_id,
+        this.customer,
+        this.part_number,
+        this.part_description,
+        this.quantity,
+        this.quantity_completed,
+        this.quantity_scrap,
+        this.priority,
+        this.status,
+        this.due_date,
+        this.started_at,
+        this.completed_at,
+        this.planned_cycle_time_ms
+      ]

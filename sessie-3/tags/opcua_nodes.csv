@@ -1,0 +1,11 @@
+Node ID,Location Path Suffix,Data Contract,Virtual Path,Tag Name
+ns=1;i=1,,_raw,,State
+ns=1;i=2,,_raw,,CycleCount
+ns=1;i=3,,_raw,,CycleTimeMS
+ns=1;i=4,,_raw,,ScrapCount
+ns=1;i=5,,_raw,,InCount
+ns=1;i=6,,_raw,,OutCount
+ns=1;i=7,,_raw,,IsDownstreamBlocked
+ns=1;i=8,,_raw,,DownTimeSec
+ns=1;i=9,,_raw,,RunTimeSec
+ns=1;i=10,,_raw,,PlannedCycleTimeMS

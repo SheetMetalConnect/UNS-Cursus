@@ -1,0 +1,70 @@
+# =============================================================================
+# MetalFab Simulator Stack
+# =============================================================================
+# Draait alle simulatoren lokaal: MQTT, OPC-UA, Modbus, Weather API, Energy API.
+#
+# Starten:  cd simulator && docker compose up -d
+# Stoppen:  docker compose down
+#
+# Na starten beschikbaar op:
+#   MQTT:      localhost:1883 (geen auth)
+#   OPC-UA:    opc.tcp://localhost:4840
+#   Modbus:    localhost:5020 (Slave ID 1)
+#   Weer API:  http://localhost:8084/api/weather/current
+#   Energie:   http://localhost:8085/api/energy/current
+# =============================================================================
+
+services:
+  hivemq:
+    image: hivemq/hivemq-ce:latest
+    container_name: metalfab-hivemq
+    restart: unless-stopped
+    environment:
+      - HIVEMQ_ALLOW_ALL_CLIENTS=true
+      - JAVA_OPTS=-Xmx384m -Xms256m
+    ports:
+      - "11883:1883"
+    volumes:
+      - hivemq-data:/opt/hivemq/data
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'exec 3<>/dev/tcp/127.0.0.1/1883'"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  simulator:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: metalfab-simulator
+    restart: unless-stopped
+    command: ["run", "--broker", "hivemq", "--level", "3"]
+    depends_on:
+      hivemq:
+        condition: service_healthy
+
+  opcua-simulator:
+    image: dh2k/machine-simulator-2:v1.1.0
+    container_name: metalfab-opcua
+    restart: unless-stopped
+    environment:
+      - SIMULATOR_PROFILE=demo-mixed
+      - SIMULATOR_OPCUA_HOSTNAME=localhost
+    ports:
+      - "4840-4853:4840-4853"
+      - "8082:8082"
+
+  data-simulators:
+    build:
+      context: ./data-simulators
+      dockerfile: Dockerfile
+    container_name: metalfab-data-simulators
+    restart: unless-stopped
+    ports:
+      - "5020:5020"
+      - "8084:8084"
+      - "8085:8085"
+
+volumes:
+  hivemq-data: {}

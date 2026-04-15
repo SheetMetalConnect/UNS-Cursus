@@ -1,0 +1,99 @@
+# Sessie 4 — Standalone flow: REST API → Werkorders in UNS
+#
+# Wat doet het:
+#   - HTTP POST endpoint op :8090/api/v1/
+#   - Ontvangt werkorder events (order.created, order.progress, order.closed)
+#   - Routeert naar UNS topic umh.v1.smc.workshop._erp.orders
+#   - De erp-order-bridge (aparte flow) schrijft naar production_orders tabel
+#
+# Deploy via: Management Console → Data Flows → Stand-alone → Add
+# Port 8090 moet exposed zijn in docker-compose.yaml (staat al klaar)
+#
+# Test met curl:
+#   curl -X POST http://localhost:8090/api/v1/ \
+#     -H "Content-Type: application/json" \
+#     -d '{
+#       "event_type": "order.created",
+#       "line_id": "laser-cutter-L1-01",
+#       "data": {
+#         "id": "WO-001",
+#         "product_id": "BRACKET-A1",
+#         "planned_qty": 100,
+#         "customer": "Metaalwerk BV",
+#         "priority": 1,
+#         "due_date": "2026-04-23"
+#       }
+#     }'
+
+input:
+  http_server:
+    address: 0.0.0.0:8090
+    allowed_verbs:
+      - POST
+    path: /api/v1/
+
+pipeline:
+  processors:
+    - nodered_js:
+        code: |
+          const path = msg.meta.http_server_request_path || '';
+          const eventType = msg.payload.event_type || '';
+          const data = msg.payload.data || {};
+          const lineId = msg.payload.line_id || '';
+
+          if (eventType === 'order.created') {
+              msg.meta.umh_topic = "umh.v1.smc.workshop._erp.orders";
+              msg.payload = {
+                  orderId: data.id || data.order_id || '',
+                  partNumber: data.product_id || '',
+                  quantity: data.planned_qty || 0,
+                  customer: data.customer || null,
+                  priority: data.priority || null,
+                  dueDate: data.due_date || null,
+                  status: 'CREATED',
+                  target_line: lineId,
+                  timestamp_ms: Date.now(),
+                  type: "production_order"
+              };
+          } else if (eventType === 'order.progress') {
+              msg.meta.umh_topic = "umh.v1.smc.workshop._erp.orders";
+              msg.payload = {
+                  orderId: data.id || data.order_id || '',
+                  partNumber: data.product_id || '',
+                  quantity: data.planned_qty || 0,
+                  quantityCompleted: data.good_qty || 0,
+                  quantityScrap: data.scrap_qty || 0,
+                  planned_cycle_time_ms: data.planned_cycle_time_ms || null,
+                  customer: data.customer || null,
+                  priority: data.priority || null,
+                  dueDate: data.due_date || null,
+                  status: 'IN_PROGRESS',
+                  target_line: lineId,
+                  timestamp_ms: Date.now(),
+                  type: "order_progress"
+              };
+          } else if (eventType === 'order.closed') {
+              msg.meta.umh_topic = "umh.v1.smc.workshop._erp.orders";
+              msg.payload = {
+                  orderId: data.id || data.order_id || '',
+                  partNumber: data.product_id || '',
+                  quantity: data.planned_qty || 0,
+                  quantityCompleted: data.good_qty || 0,
+                  quantityScrap: data.scrap_qty || 0,
+                  customer: data.customer || null,
+                  priority: data.priority || null,
+                  dueDate: data.due_date || null,
+                  status: 'COMPLETED',
+                  target_line: lineId,
+                  timestamp_ms: Date.now(),
+                  type: "production_order"
+              };
+          } else {
+              msg.meta.umh_topic = "umh.v1.smc.workshop._erp.unknown";
+              msg.payload.timestamp_ms = Date.now();
+          }
+
+          return msg;
+
+output:
+  uns: {}

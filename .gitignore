@@ -1,2 +1,8 @@
 .DS_Store
 .env
+gdrive-ref
+umh-core-ref
+umh-core-full-ref
+.claude/
+docs/
+sessie-4/OPNAME-DRAAIBOEK.md

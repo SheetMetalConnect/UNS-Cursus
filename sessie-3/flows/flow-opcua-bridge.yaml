@@ -1,0 +1,45 @@
+# =============================================================================
+# OPC-UA Bridge — Machine Simulator → UNS
+# =============================================================================
+#
+# Leest OPC-UA nodes van de cursus simulator (automotive welding, stage 1)
+# en publiceert ze als _raw naar de UNS.
+#
+# Simulator:   opc.tcp://95.217.14.139:4840 (anonymous, geen auth)
+# Machine:     automotive-welding-1-stage-1 (metal_forming)
+# Tags:        state, cycleCount, scrapCount, good, cycleTimeMS,
+#              powerConsumptionKW, temperatureC, tonnagePct, etc.
+#
+# Deploy in Management Console:
+#
+#   1. Data Flows → Bridge → Add
+#
+#   2. General tab
+#      - Protocol: OPC-UA
+#      - Data Type: Time Series
+#
+#   3. Connection tab
+#      - IP: 95.217.14.139
+#      - Port: 4840
+#
+#   4. Read Flow tab
+#      - Bij "Node IDs" → browse de beschikbare nodes
+#      - Selecteer de nodes die je wilt uitlezen
+#      - Zet Data Contract op: _raw
+#      - Of importeer tags/opcua_nodes.csv via "Import CSV"
+#
+#   5. Save & Deploy
+#
+# Verificatie:
+#   Topic Browser → OPC-UA tags verschijnen onder _raw
+#   TimescaleDB → data wordt geschreven via de historian
+#
+# Andere machines op dezelfde simulator:
+#   Poort 4840: automotive-welding-1-stage-1 (metal_forming)
+#   Poort 4841: automotive-welding-1-stage-2 (spot_welder)
+#   Poort 4842: automotive-welding-1-stage-3 (robot_welder)
+#   Poort 4843: automotive-welding-1-stage-4 (robot_pick_place)
+#   Poort 4844: electronics-smt-1-stage-1
+#   Poort 4848: food-beverage-filling-1-stage-1
+#   Poort 4851: pharma-batch-1-stage-1
+# =============================================================================

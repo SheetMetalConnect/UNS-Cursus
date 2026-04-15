@@ -13,25 +13,22 @@
 # ==============================================================================
 
 services:
-  umh:
-    image: management.umh.app/oci/united-manufacturing-hub/umh-core:v0.44.11
+  umh-core:
+    image: management.umh.app/oci/united-manufacturing-hub/umh-core:v0.44.15
     container_name: umh-core
     restart: unless-stopped
     volumes:
       - umh-core-data:/data
+    ports:
+      - "8090:8090"
+      - "8092:8092"
     environment:
-      - AUTH_TOKEN=${AUTH_TOKEN:?Maak een .env bestand met AUTH_TOKEN=<jouw-token>}
+      - AUTH_TOKEN=${AUTH_TOKEN}
       - RELEASE_CHANNEL=stable
-      - LOCATION_0=${LOCATION_0:-mijnbedrijf}
-      - LOCATION_1=${LOCATION_1:-mijnsite}
+      - LOCATION_0=${LOCATION_0:-smc}
+      - LOCATION_1=${LOCATION_1:-workshop}
       - API_URL=https://management.umh.app/api
       - DB_DSN=postgres://kafkatopostgresqlv2:umhcore@timescaledb:5432/umh?sslmode=disable
-    healthcheck:
-      test: ["CMD-SHELL", "wget -q --spider http://localhost:8080/api/v1/health || exit 1"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 60s
 
   timescaledb:
     image: management.umh.app/oci/timescale/timescaledb:2.24.0-pg17
@@ -104,6 +101,18 @@ services:
     volumes:
       - nodered-data:/data
 
+  nocodb:
+    image: nocodb/nocodb:0.258.10
+    container_name: nocodb
+    restart: unless-stopped
+    environment:
+      - NC_ALLOW_LOCAL_HOOKS=true
+      - TZ=Europe/Amsterdam
+    ports:
+      - "8088:8080"
+    volumes:
+      - nocodb-data:/usr/app/data
+
   portainer:
     image: docker.io/portainer/portainer-ce:latest
     container_name: portainer
@@ -124,4 +133,5 @@ volumes:
   grafana-data: {}
   hivemq-data: {}
   nodered-data: {}
+  nocodb-data: {}
   portainer-data: {}

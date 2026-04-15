@@ -1,0 +1,11 @@
+order_nr,product,asset,qty,customer,priority,due_date,status
+WO-001,BRACKET-A1,laser-cutter-L1-01,5,Metaalwerk BV,2,2026-04-23,Nieuw
+WO-002,FLANGE-B2,press-brake-P1-01,60,Constructie Noord,1,2026-04-23,Klaar
+WO-003,HOUSING-C3,laser-cutter-L1-01,100,Metaalwerk BV,1,2026-04-25,Nieuw
+WO-004,PANEL-D4,press-brake-P1-01,50,Staalcoating Zuid,3,2026-04-28,Nieuw
+WO-005,FRAME-E5,assembly-A1-01,200,Constructie Noord,1,2026-04-22,Bezig
+WO-006,COVER-F6,coating-C1-01,75,Metaalwerk BV,2,2026-04-30,Bezig
+WO-007,BRACKET-A1,laser-cutter-L1-02,150,Staalcoating Zuid,1,2026-04-20,Klaar
+WO-008,HOUSING-C3,laser-cutter-L1-01,80,Constructie Noord,2,2026-04-26,Nieuw
+WO-009,FLANGE-B2,press-brake-P1-01,120,Metaalwerk BV,1,2026-04-24,Nieuw
+WO-010,FRAME-E5,assembly-A1-01,30,Staalcoating Zuid,3,2026-04-29,Bezig
