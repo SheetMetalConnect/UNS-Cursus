@@ -1,0 +1,29 @@
+ id  |                  asset_name                  | enterprise |   site    |    area    |        line        | workcell | origin_id 
+-----+----------------------------------------------+------------+-----------+------------+--------------------+----------+-----------
+   2 | metalfab.eindhoven.cutting.laser_01          | metalfab   | eindhoven | cutting    | laser_01           |          | 
+   3 | smc.workshop.weather                         | smc        | workshop  | weather    |                    |          | 
+   5 | metalfab.eindhoven.cutting.laser_02          | metalfab   | eindhoven | cutting    | laser_02           |          | 
+   7 | metalfab.eindhoven.forming.press_brake_01    | metalfab   | eindhoven | forming    | press_brake_01     |          | 
+   9 | metalfab.eindhoven.forming.press_brake_02    | metalfab   | eindhoven | forming    | press_brake_02     |          | 
+  11 | metalfab.eindhoven.assembly.assembly_01      | metalfab   | eindhoven | assembly   | assembly_01        |          | 
+  13 | metalfab.eindhoven.warehouse.agv_01          | metalfab   | eindhoven | warehouse  | agv_01             |          | 
+  15 | metalfab.eindhoven.warehouse.agv_02          | metalfab   | eindhoven | warehouse  | agv_02             |          | 
+  17 | metalfab.eindhoven.finishing.coating_line_01 | metalfab   | eindhoven | finishing  | coating_line_01    |          | 
+  19 | metalfab.eindhoven.energy.main               | metalfab   | eindhoven | energy     | main               |          | 
+  28 | smc.workshop                                 | smc        | workshop  |            |                    |          | 
+  29 | SMC.Workshop                                 | SMC        | Workshop  |            |                    |          | 
+  30 | SMC.Workshop.tasmota.cabinet                 | SMC        | Workshop  | tasmota    | cabinet            |          | 
+  31 | SMC.Workshop.tasmota.siderack                | SMC        | Workshop  | tasmota    | siderack           |          | 
+  32 | SMC.Workshop.tasmota.desk                    | SMC        | Workshop  | tasmota    | desk               |          | 
+  39 | ERP.nocodb.workorders                        | ERP        | nocodb    | workorders |                    |          | 
+ 242 | smc.workshop.shopfloor.laser-cutter-L1-01    | smc        | workshop  | shopfloor  | laser-cutter-L1-01 |          | 
+ 243 | smc.workshop.shopfloor.press-brake-P1-01     | smc        | workshop  | shopfloor  | press-brake-P1-01  |          | 
+ 244 | smc.workshop.shopfloor.assembly-A1-01        | smc        | workshop  | shopfloor  | assembly-A1-01     |          | 
+ 245 | smc.workshop.shopfloor.coating-C1-01         | smc        | workshop  | shopfloor  | coating-C1-01      |          | 
+ 246 | smc.workshop.shopfloor.laser-cutter-L1-02    | smc        | workshop  | shopfloor  | laser-cutter-L1-02 |          | 
+ 316 | smc.workshop.shopfloor.laser-cutter-l1-01    | smc        | workshop  | shopfloor  | laser-cutter-l1-01 |          | 
+ 317 | smc.workshop.shopfloor.assembly-a1-01        | smc        | workshop  | shopfloor  | assembly-a1-01     |          | 
+ 318 | smc.workshop.shopfloor.press-brake-p1-01     | smc        | workshop  | shopfloor  | press-brake-p1-01  |          | 
+ 319 | smc.workshop.shopfloor.coating-c1-01         | smc        | workshop  | shopfloor  | coating-c1-01      |          | 
+(25 rows)
+

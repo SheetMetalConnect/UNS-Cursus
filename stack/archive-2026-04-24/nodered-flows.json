@@ -1,0 +1,707 @@
+[
+    {
+        "id": "tab-api-werkorder",
+        "type": "tab",
+        "label": "API Werkorder → UNS",
+        "disabled": false,
+        "info": "Sessie 4: Simpele REST API die werkorders ontvangt en via MQTT naar de UNS publiceert.\n\nTest met curl:\n  curl -X POST http://localhost:1880/api/werkorder \\\n    -H 'Content-Type: application/json' \\\n    -d '{\"order_nr\": \"WO-001\", \"asset\": \"laser-cutter-L1-01\", \"qty\": 100, \"status\": \"Nieuw\"}'"
+    },
+    {
+        "id": "tab-event-out",
+        "type": "tab",
+        "label": "Event OUT — Dashboard → NocoDB",
+        "disabled": false,
+        "info": "Sessie 4: Node-RED Dashboard formulier dat een werkorder aanmaakt in NocoDB via REST API.\n\nVervang XC_TOKEN_HIER en REPLACE_TABLE_ID met je eigen waarden."
+    },
+    {
+        "id": "tab-polling-v3",
+        "type": "tab",
+        "label": "Polling NocoDB v3 (cloud) → UNS",
+        "disabled": false,
+        "info": "Sessie 4: Poll werkorders uit NocoDB Cloud (app.nocodb.com, API v3).\n\nVervang BASE_ID_HIER en TABLE_ID_HIER met je eigen waarden.\nVervang XC_TOKEN_HIER met je NocoDB API token (account → tokens).\n\nAPI v3 response: { records: [ { id, fields: { order_nr, asset, qty, status } } ] }"
+    },
+    {
+        "id": "broker-hivemq",
+        "type": "mqtt-broker",
+        "name": "HiveMQ (lokaal)",
+        "broker": "hivemq",
+        "port": "1883",
+        "clientid": "nodered-werkorder",
+        "autoConnect": true,
+        "usetls": false,
+        "protocolVersion": "4",
+        "keepalive": "60",
+        "cleansession": true,
+        "autoUnsubscribe": true,
+        "birthTopic": "",
+        "closeTopic": "",
+        "willTopic": "",
+        "willQos": "0",
+        "willPayload": ""
+    },
+    {
+        "id": "tab-dashboard-ui",
+        "type": "ui_tab",
+        "name": "Event OUT",
+        "icon": "dashboard",
+        "order": 1
+    },
+    {
+        "id": "group-werkorder",
+        "type": "ui_group",
+        "name": "Werkorder aanmaken",
+        "tab": "tab-dashboard-ui",
+        "order": 1,
+        "disp": true,
+        "width": "6",
+        "collapse": false
+    },
+    {
+        "id": "2fb8de145c84c249",
+        "type": "ui_base",
+        "theme": {
+            "name": "theme-light",
+            "lightTheme": {
+                "default": "#0094CE",
+                "baseColor": "#0094CE",
+                "baseFont": "-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Oxygen-Sans,Ubuntu,Cantarell,Helvetica Neue,sans-serif",
+                "edited": false
+            },
+            "darkTheme": {
+                "default": "#097479",
+                "baseColor": "#097479",
+                "baseFont": "-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Oxygen-Sans,Ubuntu,Cantarell,Helvetica Neue,sans-serif",
+                "edited": false
+            },
+            "customTheme": {
+                "name": "Untitled Theme 1",
+                "default": "#4B7930",
+                "baseColor": "#4B7930",
+                "baseFont": "-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Oxygen-Sans,Ubuntu,Cantarell,Helvetica Neue,sans-serif"
+            },
+            "themeState": {
+                "base-color": {
+                    "default": "#0094CE",
+                    "value": "#0094CE",
+                    "edited": false
+                },
+                "page-titlebar-backgroundColor": {
+                    "value": "#0094CE",
+                    "edited": false
+                },
+                "page-backgroundColor": {
+                    "value": "#fafafa",
+                    "edited": false
+                },
+                "page-sidebar-backgroundColor": {
+                    "value": "#ffffff",
+                    "edited": false
+                },
+                "group-textColor": {
+                    "value": "#1bbfff",
+                    "edited": false
+                },
+                "group-borderColor": {
+                    "value": "#ffffff",
+                    "edited": false
+                },
+                "group-backgroundColor": {
+                    "value": "#ffffff",
+                    "edited": false
+                },
+                "widget-textColor": {
+                    "value": "#111111",
+                    "edited": false
+                },
+                "widget-backgroundColor": {
+                    "value": "#0094ce",
+                    "edited": false
+                },
+                "widget-borderColor": {
+                    "value": "#ffffff",
+                    "edited": false
+                },
+                "base-font": {
+                    "value": "-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Oxygen-Sans,Ubuntu,Cantarell,Helvetica Neue,sans-serif"
+                }
+            },
+            "angularTheme": {
+                "primary": "indigo",
+                "accents": "blue",
+                "warn": "red",
+                "background": "grey",
+                "palette": "light"
+            }
+        },
+        "site": {
+            "name": "Node-RED Dashboard",
+            "hideToolbar": "false",
+            "allowSwipe": "false",
+            "lockMenu": "false",
+            "allowTempTheme": "true",
+            "dateFormat": "DD/MM/YYYY",
+            "sizes": {
+                "sx": 48,
+                "sy": 48,
+                "gx": 6,
+                "gy": 6,
+                "cx": 6,
+                "cy": 6,
+                "px": 0,
+                "py": 0
+            }
+        }
+    },
+    {
+        "id": "node-http-in",
+        "type": "http in",
+        "z": "tab-api-werkorder",
+        "name": "POST /api/werkorder",
+        "url": "/api/werkorder",
+        "method": "post",
+        "upload": false,
+        "swaggerDoc": "",
+        "x": 160,
+        "y": 140,
+        "wires": [
+            [
+                "node-build-mqtt"
+            ]
+        ]
+    },
+    {
+        "id": "node-build-mqtt",
+        "type": "function",
+        "z": "tab-api-werkorder",
+        "name": "Bouw UNS bericht",
+        "func": "// Valideer\nif (!msg.payload.order_nr) {\n    msg.statusCode = 400;\n    msg.payload = { error: \"order_nr is verplicht\" };\n    return [null, msg];\n}\n\n// Bouw MQTT payload\nvar werkorder = {\n    order_nr: msg.payload.order_nr,\n    asset: msg.payload.asset || \"onbekend\",\n    qty: msg.payload.qty || 1,\n    status: msg.payload.status || \"Nieuw\",\n    timestamp: new Date().toISOString()\n};\n\n// UNS topic\nmsg.topic = \"umh.v1.smc.workshop.shopfloor.production._raw.werkorder\";\nmsg.payload = JSON.stringify(werkorder);\n\nreturn [msg, null];",
+        "outputs": 2,
+        "timeout": "",
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 400,
+        "y": 140,
+        "wires": [
+            [
+                "node-mqtt-out",
+                "node-ok-response"
+            ],
+            [
+                "node-error-response"
+            ]
+        ]
+    },
+    {
+        "id": "node-mqtt-out",
+        "type": "mqtt out",
+        "z": "tab-api-werkorder",
+        "name": "Publiceer naar UNS",
+        "topic": "",
+        "qos": "1",
+        "retain": "",
+        "respTopic": "",
+        "contentType": "application/json",
+        "userProps": "",
+        "correl": "",
+        "expiry": "",
+        "broker": "broker-hivemq",
+        "x": 650,
+        "y": 100,
+        "wires": []
+    },
+    {
+        "id": "node-ok-response",
+        "type": "function",
+        "z": "tab-api-werkorder",
+        "name": "200 OK",
+        "func": "var werkorder = JSON.parse(msg.payload);\nmsg.statusCode = 200;\nmsg.payload = {\n    status: \"ok\",\n    message: \"Werkorder \" + werkorder.order_nr + \" gepubliceerd naar UNS\",\n    topic: msg.topic\n};\nreturn msg;",
+        "outputs": 1,
+        "timeout": "",
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 640,
+        "y": 160,
+        "wires": [
+            [
+                "node-http-response"
+            ]
+        ]
+    },
+    {
+        "id": "node-error-response",
+        "type": "function",
+        "z": "tab-api-werkorder",
+        "name": "400 Error",
+        "func": "msg.statusCode = 400;\nreturn msg;",
+        "outputs": 1,
+        "timeout": "",
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 640,
+        "y": 220,
+        "wires": [
+            [
+                "node-http-response"
+            ]
+        ]
+    },
+    {
+        "id": "node-http-response",
+        "type": "http response",
+        "z": "tab-api-werkorder",
+        "name": "HTTP Response",
+        "statusCode": "",
+        "headers": {},
+        "x": 870,
+        "y": 180,
+        "wires": []
+    },
+    {
+        "id": "node-form",
+        "type": "ui_form",
+        "z": "tab-event-out",
+        "name": "Werkorder formulier",
+        "group": "group-werkorder",
+        "order": 1,
+        "width": 0,
+        "height": 0,
+        "options": [
+            {
+                "label": "Order Nr",
+                "value": "order_nr",
+                "type": "text",
+                "required": true,
+                "rows": null
+            },
+            {
+                "label": "Asset",
+                "value": "asset",
+                "type": "text",
+                "required": true,
+                "rows": null
+            },
+            {
+                "label": "Aantal",
+                "value": "qty",
+                "type": "number",
+                "required": true,
+                "rows": null
+            },
+            {
+                "label": "Status",
+                "value": "status",
+                "type": "text",
+                "required": false,
+                "rows": null
+            }
+        ],
+        "formValue": {
+            "order_nr": "",
+            "asset": "laser-cutter-L1-01",
+            "qty": 1,
+            "status": "Nieuw"
+        },
+        "payload": "",
+        "submit": "Werkorder aanmaken",
+        "cancel": "Wissen",
+        "topic": "werkorder",
+        "topicType": "str",
+        "splitLayout": false,
+        "className": "",
+        "x": 170,
+        "y": 120,
+        "wires": [
+            [
+                "node-build-body"
+            ]
+        ]
+    },
+    {
+        "id": "node-build-body",
+        "type": "function",
+        "z": "tab-event-out",
+        "name": "Build body + headers",
+        "func": "// Vervang 6jpg5FslC8a_AVzKmlubYfi4y5Osp-ileD4OrAU8 door je NocoDB API token\nvar token = \"6jpg5FslC8a_AVzKmlubYfi4y5Osp-ileD4OrAU8\";\n\nmsg.headers = {\n    \"xc-token\": token,\n    \"Content-Type\": \"application/json\"\n};\n\nmsg.payload = {\n    \"order_nr\": msg.payload.order_nr,\n    \"asset\": msg.payload.asset,\n    \"qty\": msg.payload.qty,\n    \"status\": msg.payload.status || \"Nieuw\"\n};\n\nreturn msg;",
+        "outputs": 1,
+        "timeout": "",
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 410,
+        "y": 120,
+        "wires": [
+            [
+                "node-post-nocodb"
+            ]
+        ]
+    },
+    {
+        "id": "node-post-nocodb",
+        "type": "http request",
+        "z": "tab-event-out",
+        "name": "POST NocoDB",
+        "method": "POST",
+        "ret": "obj",
+        "paytoqs": "ignore",
+        "url": "http://nocodb:8080/api/v2/tables/m5myrzr9qwyy1zi/records",
+        "tls": "",
+        "persist": false,
+        "proxy": "",
+        "insecureHTTPParser": false,
+        "authType": "",
+        "senderr": false,
+        "headers": [],
+        "x": 630,
+        "y": 120,
+        "wires": [
+            [
+                "node-response-check"
+            ]
+        ]
+    },
+    {
+        "id": "node-response-check",
+        "type": "switch",
+        "z": "tab-event-out",
+        "name": "Status check",
+        "property": "statusCode",
+        "propertyType": "msg",
+        "rules": [
+            {
+                "t": "eq",
+                "v": "200",
+                "vt": "num"
+            },
+            {
+                "t": "else"
+            }
+        ],
+        "checkall": "true",
+        "repair": false,
+        "outputs": 2,
+        "x": 830,
+        "y": 120,
+        "wires": [
+            [
+                "node-ok"
+            ],
+            [
+                "node-error"
+            ]
+        ]
+    },
+    {
+        "id": "node-ok",
+        "type": "ui_text",
+        "z": "tab-event-out",
+        "group": "group-werkorder",
+        "order": 2,
+        "width": 0,
+        "height": 0,
+        "name": "Succes",
+        "label": "Status",
+        "format": "✅ Werkorder aangemaakt!",
+        "layout": "row-spread",
+        "className": "",
+        "style": false,
+        "font": "",
+        "fontSize": 16,
+        "color": "#00a000",
+        "x": 1020,
+        "y": 100,
+        "wires": []
+    },
+    {
+        "id": "node-error",
+        "type": "ui_text",
+        "z": "tab-event-out",
+        "group": "group-werkorder",
+        "order": 3,
+        "width": 0,
+        "height": 0,
+        "name": "Fout",
+        "label": "Status",
+        "format": "❌ Fout bij aanmaken — check Node-RED debug",
+        "layout": "row-spread",
+        "className": "",
+        "style": false,
+        "font": "",
+        "fontSize": 16,
+        "color": "#cc0000",
+        "x": 1020,
+        "y": 140,
+        "wires": []
+    },
+    {
+        "id": "node-inject-poll-v3",
+        "type": "inject",
+        "z": "tab-polling-v3",
+        "name": "Poll (handmatig)",
+        "props": [],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": "1",
+        "topic": "",
+        "x": 170,
+        "y": 140,
+        "wires": [
+            [
+                "node-get-nocodb-v3"
+            ]
+        ]
+    },
+    {
+        "id": "node-get-nocodb-v3",
+        "type": "http request",
+        "z": "tab-polling-v3",
+        "name": "GET NocoDB v3 Cloud",
+        "method": "GET",
+        "ret": "obj",
+        "paytoqs": "ignore",
+        "url": "https://app.nocodb.com/api/v3/data/pfbdiwwsx30umlr/mb8afa6e4tzq1ok/records",
+        "tls": "",
+        "persist": false,
+        "proxy": "",
+        "insecureHTTPParser": false,
+        "authType": "",
+        "senderr": false,
+        "headers": [
+            {
+                "keyType": "other",
+                "keyValue": "xc-token",
+                "valueType": "other",
+                "valueValue": "nc_pat_-F0p9FkiHMOuAJL3l3nUrgatISrkhK9crXvkXZ5c"
+            }
+        ],
+        "x": 410,
+        "y": 140,
+        "wires": [
+            [
+                "node-extract-v3"
+            ]
+        ]
+    },
+    {
+        "id": "node-extract-v3",
+        "type": "function",
+        "z": "tab-polling-v3",
+        "name": "v3 → UMH payload",
+        "func": "// NocoDB v3: { records: [ { id, fields: { order_nr, asset, qty, status } } ] }\nvar records = msg.payload.records || [];\n\nvar messages = records.map(function(rec) {\n    var f = rec.fields || rec;\n    return {\n        payload: {\n            event_type: \"order.created\",\n            line_id: f.asset || \"onbekend\",\n            data: {\n                id: f.order_nr,\n                product_id: f.order_nr,\n                planned_qty: f.qty || 0\n            }\n        },\n        headers: { \"Content-Type\": \"application/json\" }\n    };\n});\n\nnode.status({text: records.length + \" werkorders → UNS\"});\nreturn [messages];",
+        "outputs": 1,
+        "timeout": "",
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 630,
+        "y": 140,
+        "wires": [
+            [
+                "node-post-uns-v3",
+                "node-debug-v3"
+            ]
+        ]
+    },
+    {
+        "id": "node-post-uns-v3",
+        "type": "http request",
+        "z": "tab-polling-v3",
+        "name": "POST → UMH Core API",
+        "method": "POST",
+        "ret": "obj",
+        "paytoqs": "ignore",
+        "url": "http://umh-core:8090/api/v1/",
+        "tls": "",
+        "persist": false,
+        "proxy": "",
+        "insecureHTTPParser": false,
+        "authType": "",
+        "senderr": false,
+        "headers": [],
+        "x": 630,
+        "y": 220,
+        "wires": [
+            [
+                "node-debug-uns-v3"
+            ]
+        ]
+    },
+    {
+        "id": "node-debug-v3",
+        "type": "debug",
+        "z": "tab-polling-v3",
+        "name": "Werkorders",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": true,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 860,
+        "y": 140,
+        "wires": []
+    },
+    {
+        "id": "node-debug-uns-v3",
+        "type": "debug",
+        "z": "tab-polling-v3",
+        "name": "UNS response",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": true,
+        "complete": "statusCode",
+        "targetType": "msg",
+        "statusVal": "statusCode",
+        "statusType": "msg",
+        "x": 860,
+        "y": 220,
+        "wires": []
+    },
+    {
+        "id": "tab-polling-v2",
+        "type": "tab",
+        "label": "Polling NocoDB v2 (local) → UNS",
+        "disabled": false,
+        "info": "Sessie 4: Poll werkorders uit lokale NocoDB (self-hosted, API v2).\n\nVervang TABLE_ID_HIER met je tabel ID.\nVervang XC_TOKEN_HIER met je NocoDB API token.\n\nAPI v2 response: { list: [ { order_nr, product, asset, qty, customer, priority, due_date, status } ] }\n\nStatus mapping: Nieuw → order.created, Bezig → order.progress, Klaar → order.closed"
+    },
+    {
+        "id": "node-inject-poll-v2",
+        "type": "inject",
+        "z": "tab-polling-v2",
+        "name": "Poll (handmatig)",
+        "props": [],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": "1",
+        "topic": "",
+        "x": 170,
+        "y": 140,
+        "wires": [
+            [
+                "node-get-nocodb-v2"
+            ]
+        ]
+    },
+    {
+        "id": "node-get-nocodb-v2",
+        "type": "http request",
+        "z": "tab-polling-v2",
+        "name": "GET NocoDB v2",
+        "method": "GET",
+        "ret": "obj",
+        "paytoqs": "ignore",
+        "url": "http://nocodb:8080/api/v2/tables/m5myrzr9qwyy1zi/records",
+        "tls": "",
+        "persist": false,
+        "proxy": "",
+        "insecureHTTPParser": false,
+        "authType": "",
+        "senderr": false,
+        "headers": [
+            {
+                "keyType": "other",
+                "keyValue": "xc-token",
+                "valueType": "other",
+                "valueValue": "6jpg5FslC8a_AVzKmlubYfi4y5Osp-ileD4OrAU8"
+            }
+        ],
+        "x": 390,
+        "y": 140,
+        "wires": [
+            [
+                "node-extract-v2"
+            ]
+        ]
+    },
+    {
+        "id": "node-extract-v2",
+        "type": "function",
+        "z": "tab-polling-v2",
+        "name": "v2 → UMH payload",
+        "func": "// NocoDB v2: { list: [ { order_nr, product, asset, qty, customer, priority, due_date, status } ] }\nvar rows = msg.payload.list || [];\n\n// Status mapping: NocoDB → UMH event type\nvar statusMap = {\n    \"Nieuw\": \"order.created\",\n    \"Bezig\": \"order.progress\",\n    \"Klaar\": \"order.closed\"\n};\n\nvar messages = rows.map(function(r) {\n    var eventType = statusMap[r.status] || \"order.created\";\n    var payload = {\n        event_type: eventType,\n        line_id: r.asset || \"onbekend\",\n        data: {\n            id: r.order_nr,\n            product_id: r.product || r.order_nr,\n            planned_qty: r.qty || 0,\n            customer: r.customer || null,\n            priority: r.priority || null,\n            due_date: r.due_date || null\n        }\n    };\n\n    // Voor progress/closed: voeg quantity velden toe\n    if (eventType === \"order.progress\" || eventType === \"order.closed\") {\n        payload.data.good_qty = r.qty_completed || 0;\n        payload.data.scrap_qty = r.qty_scrap || 0;\n    }\n\n    return {\n        payload: payload,\n        headers: { \"Content-Type\": \"application/json\" }\n    };\n});\n\nnode.status({text: rows.length + \" werkorders → UNS\"});\nreturn [messages];",
+        "outputs": 1,
+        "timeout": "",
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 600,
+        "y": 140,
+        "wires": [
+            [
+                "node-post-uns-v2",
+                "node-debug-v2"
+            ]
+        ]
+    },
+    {
+        "id": "node-post-uns-v2",
+        "type": "http request",
+        "z": "tab-polling-v2",
+        "name": "POST → UMH Core API",
+        "method": "POST",
+        "ret": "obj",
+        "paytoqs": "ignore",
+        "url": "http://umh-core:8090/api/v1/",
+        "tls": "",
+        "persist": false,
+        "proxy": "",
+        "insecureHTTPParser": false,
+        "authType": "",
+        "senderr": false,
+        "headers": [],
+        "x": 600,
+        "y": 220,
+        "wires": [
+            [
+                "node-debug-uns-v2"
+            ]
+        ]
+    },
+    {
+        "id": "node-debug-v2",
+        "type": "debug",
+        "z": "tab-polling-v2",
+        "name": "Werkorders",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": true,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 830,
+        "y": 140,
+        "wires": []
+    },
+    {
+        "id": "node-debug-uns-v2",
+        "type": "debug",
+        "z": "tab-polling-v2",
+        "name": "UNS response",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": true,
+        "complete": "statusCode",
+        "targetType": "msg",
+        "statusVal": "statusCode",
+        "statusType": "msg",
+        "x": 830,
+        "y": 220,
+        "wires": []
+    }
+]

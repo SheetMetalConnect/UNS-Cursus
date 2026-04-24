@@ -1,0 +1,112 @@
+=== UNS-Cursus Stack Archive — 2026-04-24 ===
+
+== Running Containers ==
+NAMES                                  IMAGE                                                               STATUS                     PORTS
+supabase_studio_snijnoord-v2-test      public.ecr.aws/supabase/studio:2026.01.12-sha-4e9b718               Up 4 minutes (healthy)     0.0.0.0:54323->3000/tcp, [::]:54323->3000/tcp
+supabase_pg_meta_snijnoord-v2-test     public.ecr.aws/supabase/postgres-meta:v0.95.2                       Up 4 minutes (healthy)     8080/tcp
+supabase_storage_snijnoord-v2-test     public.ecr.aws/supabase/storage-api:v1.33.5                         Up 4 minutes (healthy)     5000/tcp
+supabase_rest_snijnoord-v2-test        public.ecr.aws/supabase/postgrest:v14.3                             Up 4 minutes               3000/tcp
+supabase_realtime_snijnoord-v2-test    public.ecr.aws/supabase/realtime:v2.69.2                            Up 4 minutes (healthy)     4000/tcp
+supabase_inbucket_snijnoord-v2-test    public.ecr.aws/supabase/mailpit:v1.22.3                             Up 4 minutes (healthy)     0.0.0.0:54324->8025/tcp, [::]:54324->8025/tcp
+supabase_auth_snijnoord-v2-test        public.ecr.aws/supabase/gotrue:v2.185.0                             Up 4 minutes (healthy)     9999/tcp
+supabase_kong_snijnoord-v2-test        public.ecr.aws/supabase/kong:2.8.1                                  Up 4 minutes (healthy)     0.0.0.0:54321->8000/tcp, [::]:54321->8000/tcp
+supabase_vector_snijnoord-v2-test      public.ecr.aws/supabase/vector:0.28.1-alpine                        Up 4 minutes (healthy)     
+supabase_analytics_snijnoord-v2-test   public.ecr.aws/supabase/logflare:1.28.0                             Up 4 minutes (healthy)     0.0.0.0:54327->4000/tcp, [::]:54327->4000/tcp
+supabase_db_snijnoord-v2-test          public.ecr.aws/supabase/postgres:17.6.1.071                         Up 4 minutes (healthy)     0.0.0.0:54322->5432/tcp, [::]:54322->5432/tcp
+qf2uns                                 qf2uns-qf2uns                                                       Up 4 minutes               
+umh-core                               management.umh.app/oci/united-manufacturing-hub/umh-core:v0.44.15   Up 4 minutes               0.0.0.0:8090->8090/tcp, [::]:8090->8090/tcp, 0.0.0.0:8092->8092/tcp, [::]:8092->8092/tcp
+grafana                                management.umh.app/oci/grafana/grafana:12.3.0                       Up 4 minutes (healthy)     0.0.0.0:3000->3000/tcp, [::]:3000->3000/tcp
+portainer                              portainer/portainer-ce:latest                                       Up 4 minutes               0.0.0.0:9000->9000/tcp, [::]:9000->9000/tcp
+nodered                                nodered/node-red:latest                                             Up 4 minutes (healthy)     0.0.0.0:1880->1880/tcp, [::]:1880->1880/tcp
+timescaledb                            management.umh.app/oci/timescale/timescaledb:2.24.0-pg17            Up 4 minutes (healthy)     0.0.0.0:5432->5432/tcp, [::]:5432->5432/tcp
+hivemq                                 hivemq/hivemq-ce:latest                                             Up 4 minutes (healthy)     0.0.0.0:1883->1883/tcp, [::]:1883->1883/tcp, 0.0.0.0:8083->8000/tcp, [::]:8083->8000/tcp
+eryxon-demar                           eryxon-flow:demar-local                                             Up 4 minutes (unhealthy)   0.0.0.0:8082->80/tcp, [::]:8082->80/tcp
+
+== All Containers (including stopped) ==
+NAMES                                     IMAGE                                                               STATUS
+supabase_studio_snijnoord-v2-test         public.ecr.aws/supabase/studio:2026.01.12-sha-4e9b718               Up 4 minutes (healthy)
+supabase_pg_meta_snijnoord-v2-test        public.ecr.aws/supabase/postgres-meta:v0.95.2                       Up 4 minutes (healthy)
+supabase_edge_runtime_snijnoord-v2-test   public.ecr.aws/supabase/edge-runtime:v1.70.0                        Exited (137) 10 hours ago
+supabase_storage_snijnoord-v2-test        public.ecr.aws/supabase/storage-api:v1.33.5                         Up 4 minutes (healthy)
+supabase_rest_snijnoord-v2-test           public.ecr.aws/supabase/postgrest:v14.3                             Up 4 minutes
+supabase_realtime_snijnoord-v2-test       public.ecr.aws/supabase/realtime:v2.69.2                            Up 4 minutes (healthy)
+supabase_inbucket_snijnoord-v2-test       public.ecr.aws/supabase/mailpit:v1.22.3                             Up 4 minutes (healthy)
+supabase_auth_snijnoord-v2-test           public.ecr.aws/supabase/gotrue:v2.185.0                             Up 4 minutes (healthy)
+supabase_kong_snijnoord-v2-test           public.ecr.aws/supabase/kong:2.8.1                                  Up 4 minutes (healthy)
+supabase_vector_snijnoord-v2-test         public.ecr.aws/supabase/vector:0.28.1-alpine                        Up 4 minutes (healthy)
+supabase_analytics_snijnoord-v2-test      public.ecr.aws/supabase/logflare:1.28.0                             Up 4 minutes (healthy)
+supabase_db_snijnoord-v2-test             public.ecr.aws/supabase/postgres:17.6.1.071                         Up 4 minutes (healthy)
+qf2uns                                    qf2uns-qf2uns                                                       Up 4 minutes
+umh-core                                  management.umh.app/oci/united-manufacturing-hub/umh-core:v0.44.15   Up 4 minutes
+nocodb                                    nocodb/nocodb:0.258.10                                              Exited (143) 8 days ago
+grafana                                   management.umh.app/oci/grafana/grafana:12.3.0                       Up 4 minutes (healthy)
+portainer                                 portainer/portainer-ce:latest                                       Up 4 minutes
+nodered                                   nodered/node-red:latest                                             Up 4 minutes (healthy)
+timescaledb                               management.umh.app/oci/timescale/timescaledb:2.24.0-pg17            Up 4 minutes (healthy)
+hivemq                                    hivemq/hivemq-ce:latest                                             Up 4 minutes (healthy)
+odoo                                      odoo:18                                                             Exited (128) 10 hours ago
+eryxon-demar                              eryxon-flow:demar-local                                             Up 4 minutes (unhealthy)
+ve-director-dashboard                     grafana/grafana-oss:11.4.0                                          Exited (0) 4 days ago
+ve-dashboard-db                           postgres:17-alpine                                                  Exited (0) 4 days ago
+db                                        postgres:15                                                         Exited (0) 10 hours ago
+
+== Docker Volumes (UNS-related) ==
+deployment_nocodb-data
+nocodb-data
+stack_grafana-data
+stack_hivemq-data
+stack_nodered-data
+stack_portainer-data
+stack_timescaledb-data
+stack_umh-core-data
+uns-cursus_grafana-data
+uns-cursus_hivemq-data
+uns-cursus_nodered-data
+uns-cursus_portainer-data
+uns-cursus_timescaledb-data
+uns-cursus_umh-core-data
+
+== Docker Networks ==
+NAME                                 DRIVER
+bridge                               bridge
+dashboard_dashboard-net              bridge
+host                                 host
+none                                 null
+supabase_network_snijnoord-v2-test   bridge
+umh-network                          bridge
+
+== Compose Projects ==
+uns-cursus: /Users/vanenkhuizen/Documents/GitHub/UNS-Cursus/stack/docker-compose.yaml
+  containers: grafana, portainer, nodered, timescaledb, hivemq, nocodb (stopped)
+stack: /Users/vanenkhuizen/Documents/GitHub/UNS-Cursus/stack/docker-compose.yaml
+  containers: umh-core
+qf2uns: /Users/vanenkhuizen/Documents/GitHub/QF2UNS/docker-compose.snijnoord.yaml
+  containers: qf2uns
+
+== Volume Details ==
+--- uns-cursus_grafana-data ---
+  Created: 2026-04-14T10:19:04Z, Mountpoint: /var/lib/docker/volumes/uns-cursus_grafana-data/_data
+--- uns-cursus_hivemq-data ---
+  Created: 2026-04-14T10:19:04Z, Mountpoint: /var/lib/docker/volumes/uns-cursus_hivemq-data/_data
+--- uns-cursus_nodered-data ---
+  Created: 2026-04-14T10:19:04Z, Mountpoint: /var/lib/docker/volumes/uns-cursus_nodered-data/_data
+--- uns-cursus_portainer-data ---
+  Created: 2026-04-14T10:19:04Z, Mountpoint: /var/lib/docker/volumes/uns-cursus_portainer-data/_data
+--- uns-cursus_timescaledb-data ---
+  Created: 2026-04-14T10:19:04Z, Mountpoint: /var/lib/docker/volumes/uns-cursus_timescaledb-data/_data
+--- uns-cursus_umh-core-data ---
+  Created: 2026-04-14T10:34:57Z, Mountpoint: /var/lib/docker/volumes/uns-cursus_umh-core-data/_data
+--- stack_grafana-data ---
+  Created: 2026-03-17T13:57:12Z, Mountpoint: /var/lib/docker/volumes/stack_grafana-data/_data
+--- stack_hivemq-data ---
+  Created: 2026-03-17T13:57:12Z, Mountpoint: /var/lib/docker/volumes/stack_hivemq-data/_data
+--- stack_nodered-data ---
+  Created: 2026-03-17T13:57:12Z, Mountpoint: /var/lib/docker/volumes/stack_nodered-data/_data
+--- stack_portainer-data ---
+  Created: 2026-03-17T13:57:12Z, Mountpoint: /var/lib/docker/volumes/stack_portainer-data/_data
+--- stack_timescaledb-data ---
+  Created: 2026-03-17T13:57:12Z, Mountpoint: /var/lib/docker/volumes/stack_timescaledb-data/_data
+--- stack_umh-core-data ---
+  Created: 2026-03-17T13:57:12Z, Mountpoint: /var/lib/docker/volumes/stack_umh-core-data/_data
+--- nocodb-data ---
+  Created: 2026-04-14T11:58:16Z, Mountpoint: /var/lib/docker/volumes/nocodb-data/_data
