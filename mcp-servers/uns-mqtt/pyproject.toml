@@ -1,0 +1,12 @@
+[project]
+name = "uns-mqtt"
+version = "0.1.0"
+description = "MCP server for interacting with the UNS MQTT broker"
+requires-python = ">=3.10"
+dependencies = [
+    "mcp[cli]>=1.27.0",
+    "aiomqtt>=2.3.0",
+]
+
+[project.scripts]
+uns-mqtt = "src.server:main"
