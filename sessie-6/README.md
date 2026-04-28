@@ -1,41 +1,36 @@
 # Sessie 6 — AI-integratie & Data naar de Cloud
 
-In de vorige sessies hebben we data van de werkvloer naar de UNS gebracht en dashboards gebouwd. Nu gaan we een stap verder: data uit de UNS naar externe systemen sturen voor analyse en machine learning.
-
-## Leerdoelen
-
-- Data uit TimescaleDB exporteren naar een cloud data warehouse (BigQuery)
-- Een connector opzetten tussen de UNS en externe ML/analytics services
-- Begrijpen wanneer je data lokaal houdt vs. naar de cloud stuurt
-- Een eenvoudige voorspelling of classificatie draaien op je fabrieksdata
-
-## Wat we bouwen
-
-```
-TimescaleDB ──→ BigQuery Connector ──→ BigQuery / Cloud DWH
-                                           │
-UNS (Redpanda) ──→ ML Service ──→ Predictions terug naar UNS
-```
-
-## Onderwerpen
-
-### Part 1 — Data naar de Cloud
-- BigQuery (of alternatief) als cloud data warehouse
-- Connector configureren: welke data, hoe vaak, welk formaat
-- Privacy en security: wat stuur je wel/niet naar de cloud
-
-### Part 2 — AI/ML op fabrieksdata
-- Voorbeelden: voorspellend onderhoud, kwaliteitscontrole, anomaly detection
-- Een ML-model aanroepen vanuit de UNS pipeline
-- Resultaten terugsturen naar de namespace
-
-## Voorbereiding
-
-Materiaal volgt. Zorg dat je stack uit sessie 5 nog draait.
-
 ## Bestanden
 
-```
-sessie-6/
-  README.md              <- deze handleiding
-```
+### BigQuery ML
+
+| Bestand | Wat het doet |
+|---------|-------------|
+| `bigquery/01-create-tables.sql` | BigQuery tabellen aanmaken |
+| `bigquery/02-solar-forecast.sql` | Solar vermogen voorspellen (ARIMA_PLUS) |
+| `bigquery/03-anomaly-detection.sql` | Anomaly detection op machine data |
+| `bigquery/04-weather-regression.sql` | Weer → solar output regressie |
+
+### Data exports (CSV → BigQuery upload)
+
+| Bestand | Rijen | Inhoud |
+|---------|-------|--------|
+| `bigquery/solar_pivoted_1min.csv` | ~4.400 | Solar power per minuut |
+| `bigquery/weather_pivoted_5min.csv` | ~900 | Weer per 5 minuten |
+| `bigquery/machine_pivoted_1min.csv` | ~4.000 | Machine runtime per minuut |
+
+## BigQuery setup
+
+1. Maak een GCP project aan (gratis tier)
+2. BigQuery Console → dataset `uns_cursus` aanmaken
+3. `01-create-tables.sql` uitvoeren
+4. CSV's uploaden naar de tabellen
+5. Demo queries uitvoeren (02, 03, 04)
+
+## Drie demo's
+
+| # | Use case | Model | Data |
+|---|----------|-------|------|
+| 1 | Hoeveel stroom leveren mijn panelen morgen? | ARIMA_PLUS forecast | Solar power |
+| 2 | Draait mijn machine normaal? | Anomaly detection | Machine runtimes |
+| 3 | Welk weer bepaalt mijn opbrengst? | Linear regression | Weer + solar |
