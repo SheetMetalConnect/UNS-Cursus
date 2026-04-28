@@ -1,0 +1,315 @@
+[
+    {
+        "id": "flow_api_dashboard",
+        "type": "tab",
+        "label": "API — Dashboard Endpoints",
+        "info": "Sessie 5: REST API endpoints voor het ERP Dashboard.\n\nLevert drie endpoints:\n- GET /api/sales-orders\n- GET /api/work-orders\n- GET /api/work-order-history\n\nElk endpoint voert een SQL query uit via `docker exec` op de TimescaleDB container en retourneert JSON met CORS headers.",
+        "disabled": false
+    },
+
+    {
+        "id": "comment_api_intro",
+        "type": "comment",
+        "z": "flow_api_dashboard",
+        "name": "=== Dashboard API Endpoints (Sessie 5) ===",
+        "info": "Drie GET endpoints die data ophalen uit TimescaleDB via docker exec psql.\nHet dashboard (dashboard.html) pollt deze endpoints elke 5 seconden.",
+        "x": 260,
+        "y": 40,
+        "wires": []
+    },
+
+    {
+        "id": "comment_sales",
+        "type": "comment",
+        "z": "flow_api_dashboard",
+        "name": "--- Sales Orders ---",
+        "info": "",
+        "x": 140,
+        "y": 100,
+        "wires": []
+    },
+
+    {
+        "id": "http_in_sales",
+        "type": "http in",
+        "z": "flow_api_dashboard",
+        "name": "GET /api/sales-orders",
+        "url": "/api/sales-orders",
+        "method": "get",
+        "upload": false,
+        "swaggerDoc": "",
+        "x": 160,
+        "y": 140,
+        "wires": [["exec_sales"]]
+    },
+    {
+        "id": "exec_sales",
+        "type": "exec",
+        "z": "flow_api_dashboard",
+        "name": "psql: SELECT erp_sales_order",
+        "command": "docker exec timescaledb psql -U postgres -d umh -t -A -c \"SELECT json_agg(t) FROM (SELECT order_id, customer_name, status, milestone, due_date, order_date, delivered_date, change_type, created_at, updated_at FROM erp_sales_order ORDER BY order_date DESC) t\"",
+        "addpay": false,
+        "append": "",
+        "useSpawn": "false",
+        "timer": "10",
+        "winHide": false,
+        "oldrc": false,
+        "x": 440,
+        "y": 140,
+        "wires": [["parse_sales"], [], ["error_sales"]]
+    },
+    {
+        "id": "parse_sales",
+        "type": "function",
+        "z": "flow_api_dashboard",
+        "name": "Parse JSON + CORS",
+        "func": "// psql json_agg retourneert een JSON string (of null als tabel leeg is)\nlet raw = (msg.payload || '').trim();\n\ntry {\n    msg.payload = raw && raw !== '' ? JSON.parse(raw) : [];\n} catch (e) {\n    // Fallback: als json_agg faalt, retourneer lege array\n    node.warn('Sales orders parse error: ' + e.message);\n    msg.payload = [];\n}\n\n// CORS headers\nmsg.headers = {\n    'Access-Control-Allow-Origin': '*',\n    'Access-Control-Allow-Methods': 'GET, OPTIONS',\n    'Content-Type': 'application/json'\n};\n\nreturn msg;",
+        "outputs": 1,
+        "x": 700,
+        "y": 140,
+        "wires": [["http_out_sales"]]
+    },
+    {
+        "id": "error_sales",
+        "type": "function",
+        "z": "flow_api_dashboard",
+        "name": "Error → 500",
+        "func": "node.error('Sales orders query mislukt: ' + msg.payload);\nmsg.payload = { error: 'Query mislukt', detail: String(msg.payload) };\nmsg.statusCode = 500;\nmsg.headers = {\n    'Access-Control-Allow-Origin': '*',\n    'Content-Type': 'application/json'\n};\nreturn msg;",
+        "outputs": 1,
+        "x": 700,
+        "y": 200,
+        "wires": [["http_out_sales"]]
+    },
+    {
+        "id": "http_out_sales",
+        "type": "http response",
+        "z": "flow_api_dashboard",
+        "name": "Response",
+        "statusCode": "",
+        "headers": {},
+        "x": 920,
+        "y": 140,
+        "wires": []
+    },
+
+    {
+        "id": "comment_work",
+        "type": "comment",
+        "z": "flow_api_dashboard",
+        "name": "--- Werkorders (huidige staat) ---",
+        "info": "",
+        "x": 190,
+        "y": 280,
+        "wires": []
+    },
+
+    {
+        "id": "http_in_work",
+        "type": "http in",
+        "z": "flow_api_dashboard",
+        "name": "GET /api/work-orders",
+        "url": "/api/work-orders",
+        "method": "get",
+        "upload": false,
+        "swaggerDoc": "",
+        "x": 160,
+        "y": 320,
+        "wires": [["exec_work"]]
+    },
+    {
+        "id": "exec_work",
+        "type": "exec",
+        "z": "flow_api_dashboard",
+        "name": "psql: SELECT erp_work_order",
+        "command": "docker exec timescaledb psql -U postgres -d umh -t -A -c \"SELECT json_agg(t) FROM (SELECT order_nr, product, qty, customer, priority, due_date, status, change_type, created_at, updated_at FROM erp_work_order ORDER BY priority ASC, due_date ASC) t\"",
+        "addpay": false,
+        "append": "",
+        "useSpawn": "false",
+        "timer": "10",
+        "winHide": false,
+        "oldrc": false,
+        "x": 440,
+        "y": 320,
+        "wires": [["parse_work"], [], ["error_work"]]
+    },
+    {
+        "id": "parse_work",
+        "type": "function",
+        "z": "flow_api_dashboard",
+        "name": "Parse JSON + CORS",
+        "func": "let raw = (msg.payload || '').trim();\n\ntry {\n    msg.payload = raw && raw !== '' ? JSON.parse(raw) : [];\n} catch (e) {\n    node.warn('Work orders parse error: ' + e.message);\n    msg.payload = [];\n}\n\nmsg.headers = {\n    'Access-Control-Allow-Origin': '*',\n    'Access-Control-Allow-Methods': 'GET, OPTIONS',\n    'Content-Type': 'application/json'\n};\n\nreturn msg;",
+        "outputs": 1,
+        "x": 700,
+        "y": 320,
+        "wires": [["http_out_work"]]
+    },
+    {
+        "id": "error_work",
+        "type": "function",
+        "z": "flow_api_dashboard",
+        "name": "Error → 500",
+        "func": "node.error('Work orders query mislukt: ' + msg.payload);\nmsg.payload = { error: 'Query mislukt', detail: String(msg.payload) };\nmsg.statusCode = 500;\nmsg.headers = {\n    'Access-Control-Allow-Origin': '*',\n    'Content-Type': 'application/json'\n};\nreturn msg;",
+        "outputs": 1,
+        "x": 700,
+        "y": 380,
+        "wires": [["http_out_work"]]
+    },
+    {
+        "id": "http_out_work",
+        "type": "http response",
+        "z": "flow_api_dashboard",
+        "name": "Response",
+        "statusCode": "",
+        "headers": {},
+        "x": 920,
+        "y": 320,
+        "wires": []
+    },
+
+    {
+        "id": "comment_history",
+        "type": "comment",
+        "z": "flow_api_dashboard",
+        "name": "--- Werkorder History (audit trail) ---",
+        "info": "",
+        "x": 210,
+        "y": 460,
+        "wires": []
+    },
+
+    {
+        "id": "http_in_history",
+        "type": "http in",
+        "z": "flow_api_dashboard",
+        "name": "GET /api/work-order-history",
+        "url": "/api/work-order-history",
+        "method": "get",
+        "upload": false,
+        "swaggerDoc": "",
+        "x": 180,
+        "y": 500,
+        "wires": [["exec_history"]]
+    },
+    {
+        "id": "exec_history",
+        "type": "exec",
+        "z": "flow_api_dashboard",
+        "name": "psql: SELECT erp_work_order_history",
+        "command": "docker exec timescaledb psql -U postgres -d umh -t -A -c \"SELECT json_agg(t) FROM (SELECT history_id, order_nr, product, qty, customer, priority, due_date, status, change_type, recorded_at FROM erp_work_order_history ORDER BY recorded_at DESC LIMIT 100) t\"",
+        "addpay": false,
+        "append": "",
+        "useSpawn": "false",
+        "timer": "10",
+        "winHide": false,
+        "oldrc": false,
+        "x": 460,
+        "y": 500,
+        "wires": [["parse_history"], [], ["error_history"]]
+    },
+    {
+        "id": "parse_history",
+        "type": "function",
+        "z": "flow_api_dashboard",
+        "name": "Parse JSON + CORS",
+        "func": "let raw = (msg.payload || '').trim();\n\ntry {\n    msg.payload = raw && raw !== '' ? JSON.parse(raw) : [];\n} catch (e) {\n    node.warn('Work order history parse error: ' + e.message);\n    msg.payload = [];\n}\n\nmsg.headers = {\n    'Access-Control-Allow-Origin': '*',\n    'Access-Control-Allow-Methods': 'GET, OPTIONS',\n    'Content-Type': 'application/json'\n};\n\nreturn msg;",
+        "outputs": 1,
+        "x": 720,
+        "y": 500,
+        "wires": [["http_out_history"]]
+    },
+    {
+        "id": "error_history",
+        "type": "function",
+        "z": "flow_api_dashboard",
+        "name": "Error → 500",
+        "func": "node.error('Work order history query mislukt: ' + msg.payload);\nmsg.payload = { error: 'Query mislukt', detail: String(msg.payload) };\nmsg.statusCode = 500;\nmsg.headers = {\n    'Access-Control-Allow-Origin': '*',\n    'Content-Type': 'application/json'\n};\nreturn msg;",
+        "outputs": 1,
+        "x": 720,
+        "y": 560,
+        "wires": [["http_out_history"]]
+    },
+    {
+        "id": "http_out_history",
+        "type": "http response",
+        "z": "flow_api_dashboard",
+        "name": "Response",
+        "statusCode": "",
+        "headers": {},
+        "x": 940,
+        "y": 500,
+        "wires": []
+    },
+
+    {
+        "id": "comment_cors",
+        "type": "comment",
+        "z": "flow_api_dashboard",
+        "name": "--- CORS Preflight (OPTIONS) ---",
+        "info": "Browsers sturen een OPTIONS preflight request voor cross-origin fetch().\nDeze handler retourneert de juiste CORS headers.",
+        "x": 190,
+        "y": 640,
+        "wires": []
+    },
+
+    {
+        "id": "http_in_cors_sales",
+        "type": "http in",
+        "z": "flow_api_dashboard",
+        "name": "OPTIONS /api/sales-orders",
+        "url": "/api/sales-orders",
+        "method": "options",
+        "upload": false,
+        "swaggerDoc": "",
+        "x": 180,
+        "y": 680,
+        "wires": [["cors_response"]]
+    },
+    {
+        "id": "http_in_cors_work",
+        "type": "http in",
+        "z": "flow_api_dashboard",
+        "name": "OPTIONS /api/work-orders",
+        "url": "/api/work-orders",
+        "method": "options",
+        "upload": false,
+        "swaggerDoc": "",
+        "x": 180,
+        "y": 720,
+        "wires": [["cors_response"]]
+    },
+    {
+        "id": "http_in_cors_history",
+        "type": "http in",
+        "z": "flow_api_dashboard",
+        "name": "OPTIONS /api/work-order-history",
+        "url": "/api/work-order-history",
+        "method": "options",
+        "upload": false,
+        "swaggerDoc": "",
+        "x": 200,
+        "y": 760,
+        "wires": [["cors_response"]]
+    },
+    {
+        "id": "cors_response",
+        "type": "function",
+        "z": "flow_api_dashboard",
+        "name": "CORS Preflight 204",
+        "func": "msg.payload = '';\nmsg.statusCode = 204;\nmsg.headers = {\n    'Access-Control-Allow-Origin': '*',\n    'Access-Control-Allow-Methods': 'GET, OPTIONS',\n    'Access-Control-Allow-Headers': 'Content-Type',\n    'Access-Control-Max-Age': '86400'\n};\nreturn msg;",
+        "outputs": 1,
+        "x": 480,
+        "y": 720,
+        "wires": [["http_out_cors"]]
+    },
+    {
+        "id": "http_out_cors",
+        "type": "http response",
+        "z": "flow_api_dashboard",
+        "name": "Response",
+        "statusCode": "",
+        "headers": {},
+        "x": 680,
+        "y": 720,
+        "wires": []
+    }
+]

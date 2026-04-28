@@ -1,0 +1,52 @@
+# ==============================================================================
+# NocoDB Webhook → Work Order Process (event-driven ingest)
+# ==============================================================================
+# Ontvangt HTTP POST van NocoDB webhook bij elke insert/update.
+# Publiceert naar MQTT _work_order/process topic — de bridges pakken het op.
+#
+# Dit is het verschil met polling: NocoDB PUSHT bij elke wijziging,
+# in plaats van dat Node-RED elke X seconden PULLT.
+#
+# Deploy via: Management Console → Data Flows → Stand-alone → Add
+# Naam: webhook-work-order
+#
+# Poort 8092 moet exposed zijn in docker-compose.yaml (staat al klaar)
+#
+# NocoDB webhook instellen:
+#   1. Open NocoDB → werkorders tabel → Details → Webhooks
+#   2. Event: After Insert / After Update
+#   3. URL: http://umh-core:8092/webhook/workorder
+#   4. Method: POST
+# ==============================================================================
+
+input:
+  http_server:
+    address: 0.0.0.0:8092
+    path: /webhook/workorder
+    allowed_verbs: [POST]
+
+pipeline:
+  processors:
+    - bloblang: |
+        # NocoDB v2 webhook payload:
+        #   After Insert: { type: "records.after.insert", data: { table_name: "...", rows: [{...}] } }
+        #   After Update: { type: "records.after.update", data: { table_name: "...", rows: [{...}], previous_rows: [{...}] } }
+        let rows = this.data.rows.or([this.data]).or([])
+        root = if $rows.length() == 0 { deleted() } else { $rows.index(0) }
+
+    - bloblang: |
+        root.order_nr = this.order_nr.or(this.Id.string()).or("")
+        root.product = this.product.or("")
+        root.qty = this.qty.or(0)
+        root.customer = this.customer.or("")
+        root.priority = this.priority.or(null)
+        root.due_date = this.due_date.or(null)
+        root.status = this.status.or("Nieuw")
+
+output:
+  mqtt:
+    client_id: webhook_work_order
+    dynamic_client_id_suffix: nanoid
+    topic: umh/v1/smc/vienna/_work_order/process
+    urls:
+      - tcp://hivemq:1883

@@ -1,0 +1,102 @@
+{
+  "annotations": {"list": []},
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "title": "Werkorders — Huidige staat",
+      "type": "table",
+      "gridPos": {"h": 10, "w": 24, "x": 0, "y": 0},
+      "datasource": {"type": "grafana-postgresql-datasource", "uid": "umh-timescaledb"},
+      "fieldConfig": {
+        "defaults": {
+          "custom": {"align": "auto", "cellOptions": {"type": "auto"}, "filterable": true}
+        },
+        "overrides": [
+          {"matcher": {"id": "byName", "options": "status"}, "properties": [{"id": "custom.cellOptions", "value": {"type": "color-text"}}]},
+          {"matcher": {"id": "byName", "options": "updated_at"}, "properties": [{"id": "unit", "value": "dateTimeAsIso"}]}
+        ]
+      },
+      "options": {"showHeader": true, "sortBy": [{"displayName": "order_nr", "desc": false}]},
+      "targets": [
+        {
+          "datasource": {"type": "grafana-postgresql-datasource", "uid": "umh-timescaledb"},
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT order_nr, product, customer, qty, priority, status, change_type, due_date, updated_at FROM erp_work_order ORDER BY order_nr;",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "title": "Werkorder History (audit trail)",
+      "type": "table",
+      "gridPos": {"h": 10, "w": 16, "x": 0, "y": 10},
+      "datasource": {"type": "grafana-postgresql-datasource", "uid": "umh-timescaledb"},
+      "fieldConfig": {
+        "defaults": {
+          "custom": {"align": "auto", "cellOptions": {"type": "auto"}, "filterable": true}
+        },
+        "overrides": [
+          {"matcher": {"id": "byName", "options": "change_type"}, "properties": [{"id": "custom.cellOptions", "value": {"type": "color-text"}}, {"id": "color", "value": {"mode": "fixed", "fixedColor": "green"}}]},
+          {"matcher": {"id": "byName", "options": "recorded_at"}, "properties": [{"id": "unit", "value": "dateTimeAsIso"}]}
+        ]
+      },
+      "options": {"showHeader": true, "sortBy": [{"displayName": "recorded_at", "desc": true}]},
+      "targets": [
+        {
+          "datasource": {"type": "grafana-postgresql-datasource", "uid": "umh-timescaledb"},
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT order_nr, product, customer, status, change_type, recorded_at FROM erp_work_order_history ORDER BY recorded_at DESC LIMIT 50;",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "title": "Werkorders per Status",
+      "type": "piechart",
+      "gridPos": {"h": 5, "w": 8, "x": 16, "y": 10},
+      "datasource": {"type": "grafana-postgresql-datasource", "uid": "umh-timescaledb"},
+      "options": {"legend": {"displayMode": "table", "placement": "right"}, "pieType": "donut"},
+      "targets": [
+        {
+          "datasource": {"type": "grafana-postgresql-datasource", "uid": "umh-timescaledb"},
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT status, count(*) AS aantal FROM erp_work_order GROUP BY status ORDER BY aantal DESC;",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "title": "Wijzigingen per Werkorder",
+      "type": "barchart",
+      "gridPos": {"h": 5, "w": 8, "x": 16, "y": 15},
+      "datasource": {"type": "grafana-postgresql-datasource", "uid": "umh-timescaledb"},
+      "options": {"orientation": "horizontal", "showValue": "always"},
+      "targets": [
+        {
+          "datasource": {"type": "grafana-postgresql-datasource", "uid": "umh-timescaledb"},
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT order_nr, count(*) AS wijzigingen FROM erp_work_order_history GROUP BY order_nr ORDER BY wijzigingen DESC;",
+          "refId": "A"
+        }
+      ]
+    }
+  ],
+  "schemaVersion": 39,
+  "tags": ["erp", "sessie-5"],
+  "templating": {"list": []},
+  "time": {"from": "now-24h", "to": "now"},
+  "title": "ERP — Werkorders & History",
+  "uid": "erp-work-orders"
+}

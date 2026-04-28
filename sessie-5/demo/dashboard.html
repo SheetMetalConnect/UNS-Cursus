@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UNS Cursus — ERP Dashboard (Sessie 5)</title>
+
+    <!-- Tailwind CSS via CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        surface: '#1e1e2e',
+                        card: '#282840',
+                        border: '#3b3b5c',
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- React via CDN -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <style>
+        body { background: #1e1e2e; color: #e0e0f0; font-family: 'Inter', system-ui, sans-serif; }
+        /* Smooth tab transitions */
+        .tab-active { border-bottom: 2px solid #818cf8; color: #818cf8; }
+        .tab-inactive { border-bottom: 2px solid transparent; color: #9ca3af; }
+        .tab-inactive:hover { color: #c4b5fd; }
+        /* Table row hover */
+        tr:hover td { background: rgba(99, 102, 241, 0.08); }
+        /* Pulse animation for auto-refresh indicator */
+        @keyframes pulse-dot { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+        .pulse-dot { animation: pulse-dot 2s infinite; }
+    </style>
+</head>
+<body class="min-h-screen">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useCallback } = React;
+
+        // =====================================================================
+        // Configuratie
+        // =====================================================================
+        const API_BASE = 'http://localhost:1880';
+        const REFRESH_INTERVAL = 5000; // 5 seconden auto-refresh
+
+        // =====================================================================
+        // Status badge kleuren
+        // =====================================================================
+        function StatusBadge({ status }) {
+            const colors = {
+                'Open':        'bg-blue-500/20 text-blue-300 border-blue-500/30',
+                'Bevestigd':   'bg-yellow-500/20 text-yellow-300 border-yellow-500/30',
+                'Nieuw':       'bg-yellow-500/20 text-yellow-300 border-yellow-500/30',
+                'Verzonden':   'bg-orange-500/20 text-orange-300 border-orange-500/30',
+                'Bezig':       'bg-orange-500/20 text-orange-300 border-orange-500/30',
+                'In productie':'bg-orange-500/20 text-orange-300 border-orange-500/30',
+                'Klaar':       'bg-green-500/20 text-green-300 border-green-500/30',
+                'Gefactureerd':'bg-green-500/20 text-green-300 border-green-500/30',
+                'Afgerond':    'bg-green-500/20 text-green-300 border-green-500/30',
+            };
+            const cls = colors[status] || 'bg-gray-500/20 text-gray-300 border-gray-500/30';
+            return (
+                <span className={`inline-block px-2.5 py-0.5 rounded-full text-xs font-medium border ${cls}`}>
+                    {status || '—'}
+                </span>
+            );
+        }
+
+        // =====================================================================
+        // Prioriteit badge
+        // =====================================================================
+        function PriorityBadge({ priority }) {
+            const labels = { 1: 'Hoog', 2: 'Normaal', 3: 'Laag' };
+            const colors = {
+                1: 'bg-red-500/20 text-red-300',
+                2: 'bg-gray-500/20 text-gray-300',
+                3: 'bg-slate-500/20 text-slate-400',
+            };
+            const label = labels[priority] || `P${priority}`;
+            const cls = colors[priority] || 'bg-gray-500/20 text-gray-300';
+            return (
+                <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${cls}`}>
+                    {label}
+                </span>
+            );
+        }
+
+        // =====================================================================
+        // Datum formatter (Nederlands)
+        // =====================================================================
+        function formatDate(dateStr) {
+            if (!dateStr) return '—';
+            try {
+                const d = new Date(dateStr);
+                return d.toLocaleDateString('nl-NL', {
+                    day: '2-digit', month: '2-digit', year: 'numeric'
+                });
+            } catch {
+                return dateStr;
+            }
+        }
+
+        function formatDateTime(dateStr) {
+            if (!dateStr) return '—';
+            try {
+                const d = new Date(dateStr);
+                return d.toLocaleString('nl-NL', {
+                    day: '2-digit', month: '2-digit', year: 'numeric',
+                    hour: '2-digit', minute: '2-digit', second: '2-digit'
+                });
+            } catch {
+                return dateStr;
+            }
+        }
+
+        // =====================================================================
+        // Sales Orders Tab
+        // =====================================================================
+        function SalesOrdersTab({ data, loading, error }) {
+            return (
+                <div>
+                    <h2 className="text-lg font-semibold mb-4 text-indigo-300">
+                        Sales Orders
+                        <span className="text-sm font-normal text-gray-500 ml-2">
+                            ({data.length} orders)
+                        </span>
+                    </h2>
+                    {error && <ErrorMessage msg={error} />}
+                    <div className="overflow-x-auto rounded-lg border border-border">
+                        <table className="w-full text-sm">
+                            <thead>
+                                <tr className="bg-card text-left text-gray-400 text-xs uppercase tracking-wider">
+                                    <th className="px-4 py-3">Order ID</th>
+                                    <th className="px-4 py-3">Klant</th>
+                                    <th className="px-4 py-3">Status</th>
+                                    <th className="px-4 py-3">Milestone</th>
+                                    <th className="px-4 py-3">Besteldatum</th>
+                                    <th className="px-4 py-3">Leverdatum</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-border">
+                                {data.length === 0 && !loading && (
+                                    <tr>
+                                        <td colSpan="6" className="px-4 py-8 text-center text-gray-500">
+                                            Geen sales orders gevonden
+                                        </td>
+                                    </tr>
+                                )}
+                                {data.map((row, i) => (
+                                    <tr key={row.order_id || i} className="transition-colors">
+                                        <td className="px-4 py-3 font-mono text-indigo-300">{row.order_id}</td>
+                                        <td className="px-4 py-3">{row.customer_name || '—'}</td>
+                                        <td className="px-4 py-3"><StatusBadge status={row.status} /></td>
+                                        <td className="px-4 py-3 text-gray-400">{row.milestone || '—'}</td>
+                                        <td className="px-4 py-3 text-gray-400">{formatDate(row.order_date)}</td>
+                                        <td className="px-4 py-3 text-gray-400">{formatDate(row.due_date)}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            );
+        }
+
+        // =====================================================================
+        // Werkorders Tab
+        // =====================================================================
+        function WorkOrdersTab({ data, history, loading, error }) {
+            return (
+                <div className="space-y-6">
+                    {/* Huidige werkorders */}
+                    <div>
+                        <h2 className="text-lg font-semibold mb-4 text-indigo-300">
+                            Werkorders (huidige staat)
+                            <span className="text-sm font-normal text-gray-500 ml-2">
+                                ({data.length} orders)
+                            </span>
+                        </h2>
+                        {error && <ErrorMessage msg={error} />}
+                        <div className="overflow-x-auto rounded-lg border border-border">
+                            <table className="w-full text-sm">
+                                <thead>
+                                    <tr className="bg-card text-left text-gray-400 text-xs uppercase tracking-wider">
+                                        <th className="px-4 py-3">Order Nr</th>
+                                        <th className="px-4 py-3">Product</th>
+                                        <th className="px-4 py-3">Klant</th>
+                                        <th className="px-4 py-3 text-right">Aantal</th>
+                                        <th className="px-4 py-3">Prioriteit</th>
+                                        <th className="px-4 py-3">Status</th>
+                                        <th className="px-4 py-3">Leverdatum</th>
+                                        <th className="px-4 py-3">Wijziging</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-border">
+                                    {data.length === 0 && !loading && (
+                                        <tr>
+                                            <td colSpan="8" className="px-4 py-8 text-center text-gray-500">
+                                                Geen werkorders gevonden
+                                            </td>
+                                        </tr>
+                                    )}
+                                    {data.map((row, i) => (
+                                        <tr key={row.order_nr || i} className="transition-colors">
+                                            <td className="px-4 py-3 font-mono text-indigo-300">{row.order_nr}</td>
+                                            <td className="px-4 py-3 font-mono">{row.product || '—'}</td>
+                                            <td className="px-4 py-3">{row.customer || '—'}</td>
+                                            <td className="px-4 py-3 text-right tabular-nums">{row.qty ?? '—'}</td>
+                                            <td className="px-4 py-3">
+                                                {row.priority != null ? <PriorityBadge priority={row.priority} /> : '—'}
+                                            </td>
+                                            <td className="px-4 py-3"><StatusBadge status={row.status} /></td>
+                                            <td className="px-4 py-3 text-gray-400">{formatDate(row.due_date)}</td>
+                                            <td className="px-4 py-3 text-gray-500 text-xs">{row.change_type || '—'}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    {/* History */}
+                    <div>
+                        <h2 className="text-lg font-semibold mb-4 text-purple-300">
+                            Werkorder History (audit trail)
+                            <span className="text-sm font-normal text-gray-500 ml-2">
+                                ({history.length} records)
+                            </span>
+                        </h2>
+                        <div className="overflow-x-auto rounded-lg border border-border">
+                            <table className="w-full text-sm">
+                                <thead>
+                                    <tr className="bg-card text-left text-gray-400 text-xs uppercase tracking-wider">
+                                        <th className="px-4 py-3">#</th>
+                                        <th className="px-4 py-3">Order Nr</th>
+                                        <th className="px-4 py-3">Product</th>
+                                        <th className="px-4 py-3">Status</th>
+                                        <th className="px-4 py-3">Wijziging</th>
+                                        <th className="px-4 py-3 text-right">Aantal</th>
+                                        <th className="px-4 py-3">Tijdstip</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-border">
+                                    {history.length === 0 && !loading && (
+                                        <tr>
+                                            <td colSpan="7" className="px-4 py-8 text-center text-gray-500">
+                                                Geen history gevonden
+                                            </td>
+                                        </tr>
+                                    )}
+                                    {history.map((row, i) => (
+                                        <tr key={row.history_id || i} className="transition-colors">
+                                            <td className="px-4 py-3 text-gray-600 text-xs">{row.history_id || '—'}</td>
+                                            <td className="px-4 py-3 font-mono text-purple-300">{row.order_nr}</td>
+                                            <td className="px-4 py-3 font-mono">{row.product || '—'}</td>
+                                            <td className="px-4 py-3"><StatusBadge status={row.status} /></td>
+                                            <td className="px-4 py-3 text-xs">
+                                                <span className="px-2 py-0.5 rounded bg-purple-500/15 text-purple-300">
+                                                    {row.change_type}
+                                                </span>
+                                            </td>
+                                            <td className="px-4 py-3 text-right tabular-nums">{row.qty ?? '—'}</td>
+                                            <td className="px-4 py-3 text-gray-400 text-xs">{formatDateTime(row.recorded_at)}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        // =====================================================================
+        // Error message component
+        // =====================================================================
+        function ErrorMessage({ msg }) {
+            return (
+                <div className="mb-4 px-4 py-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-300 text-sm">
+                    <strong>Fout:</strong> {msg}
+                    <div className="text-xs text-red-400 mt-1">
+                        Controleer of Node-RED draait op localhost:1880 met de API flow.
+                    </div>
+                </div>
+            );
+        }
+
+        // =====================================================================
+        // Main App
+        // =====================================================================
+        function App() {
+            const [tab, setTab] = useState('sales');
+            const [salesOrders, setSalesOrders] = useState([]);
+            const [workOrders, setWorkOrders] = useState([]);
+            const [workOrderHistory, setWorkOrderHistory] = useState([]);
+            const [loading, setLoading] = useState(true);
+            const [errors, setErrors] = useState({});
+            const [lastUpdate, setLastUpdate] = useState(null);
+            const [autoRefresh, setAutoRefresh] = useState(true);
+
+            // Fetch data van Node-RED API endpoints
+            const fetchData = useCallback(async () => {
+                const endpoints = {
+                    sales: `${API_BASE}/api/sales-orders`,
+                    work: `${API_BASE}/api/work-orders`,
+                    history: `${API_BASE}/api/work-order-history`,
+                };
+
+                const newErrors = {};
+
+                // Alle drie parallel ophalen
+                const results = await Promise.allSettled([
+                    fetch(endpoints.sales).then(r => {
+                        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+                        return r.json();
+                    }),
+                    fetch(endpoints.work).then(r => {
+                        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+                        return r.json();
+                    }),
+                    fetch(endpoints.history).then(r => {
+                        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+                        return r.json();
+                    }),
+                ]);
+
+                if (results[0].status === 'fulfilled') {
+                    setSalesOrders(Array.isArray(results[0].value) ? results[0].value : []);
+                } else {
+                    newErrors.sales = results[0].reason.message;
+                }
+
+                if (results[1].status === 'fulfilled') {
+                    setWorkOrders(Array.isArray(results[1].value) ? results[1].value : []);
+                } else {
+                    newErrors.work = results[1].reason.message;
+                }
+
+                if (results[2].status === 'fulfilled') {
+                    setWorkOrderHistory(Array.isArray(results[2].value) ? results[2].value : []);
+                } else {
+                    newErrors.history = results[2].reason.message;
+                }
+
+                setErrors(newErrors);
+                setLastUpdate(new Date());
+                setLoading(false);
+            }, []);
+
+            // Initieel laden + auto-refresh
+            useEffect(() => {
+                fetchData();
+                if (!autoRefresh) return;
+                const interval = setInterval(fetchData, REFRESH_INTERVAL);
+                return () => clearInterval(interval);
+            }, [fetchData, autoRefresh]);
+
+            const tabClass = (t) => t === tab ? 'tab-active' : 'tab-inactive';
+
+            return (
+                <div className="max-w-7xl mx-auto px-4 py-6">
+                    {/* Header */}
+                    <header className="flex items-center justify-between mb-6">
+                        <div>
+                            <h1 className="text-2xl font-bold text-white">
+                                ERP Dashboard
+                            </h1>
+                            <p className="text-sm text-gray-500 mt-1">
+                                UNS Cursus — Sessie 5 — Live data uit TimescaleDB
+                            </p>
+                        </div>
+                        <div className="flex items-center gap-4 text-sm">
+                            {/* Auto-refresh toggle */}
+                            <button
+                                onClick={() => setAutoRefresh(!autoRefresh)}
+                                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border transition-colors ${
+                                    autoRefresh
+                                        ? 'border-green-500/30 bg-green-500/10 text-green-300'
+                                        : 'border-gray-600 bg-gray-700/30 text-gray-400'
+                                }`}
+                            >
+                                <span className={`inline-block w-2 h-2 rounded-full ${
+                                    autoRefresh ? 'bg-green-400 pulse-dot' : 'bg-gray-500'
+                                }`}></span>
+                                Auto-refresh {autoRefresh ? 'aan' : 'uit'}
+                            </button>
+                            {/* Manual refresh */}
+                            <button
+                                onClick={fetchData}
+                                className="px-3 py-1.5 rounded-lg border border-border bg-card text-gray-300 hover:bg-indigo-500/10 hover:border-indigo-500/30 transition-colors"
+                            >
+                                Vernieuwen
+                            </button>
+                            {/* Timestamp */}
+                            {lastUpdate && (
+                                <span className="text-gray-500 text-xs">
+                                    Laatst bijgewerkt: {lastUpdate.toLocaleTimeString('nl-NL')}
+                                </span>
+                            )}
+                        </div>
+                    </header>
+
+                    {/* Tabs */}
+                    <nav className="flex gap-6 mb-6 border-b border-border">
+                        <button
+                            className={`pb-3 px-1 text-sm font-medium transition-colors ${tabClass('sales')}`}
+                            onClick={() => setTab('sales')}
+                        >
+                            Sales Orders
+                            {salesOrders.length > 0 && (
+                                <span className="ml-2 px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 text-xs">
+                                    {salesOrders.length}
+                                </span>
+                            )}
+                        </button>
+                        <button
+                            className={`pb-3 px-1 text-sm font-medium transition-colors ${tabClass('work')}`}
+                            onClick={() => setTab('work')}
+                        >
+                            Werkorders
+                            {workOrders.length > 0 && (
+                                <span className="ml-2 px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 text-xs">
+                                    {workOrders.length}
+                                </span>
+                            )}
+                        </button>
+                    </nav>
+
+                    {/* Loading state */}
+                    {loading && (
+                        <div className="text-center py-12 text-gray-500">
+                            Data ophalen...
+                        </div>
+                    )}
+
+                    {/* Tab content */}
+                    {!loading && tab === 'sales' && (
+                        <SalesOrdersTab
+                            data={salesOrders}
+                            loading={loading}
+                            error={errors.sales}
+                        />
+                    )}
+                    {!loading && tab === 'work' && (
+                        <WorkOrdersTab
+                            data={workOrders}
+                            history={workOrderHistory}
+                            loading={loading}
+                            error={errors.work || errors.history}
+                        />
+                    )}
+
+                    {/* Footer */}
+                    <footer className="mt-8 pt-4 border-t border-border text-xs text-gray-600 text-center">
+                        Data wordt opgehaald via Node-RED (localhost:1880) uit TimescaleDB.
+                        Refresh interval: {REFRESH_INTERVAL / 1000}s.
+                    </footer>
+                </div>
+            );
+        }
+
+        // =====================================================================
+        // Mount
+        // =====================================================================
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>

@@ -1,0 +1,77 @@
+{
+  "annotations": {"list": []},
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "title": "Sales Orders — Huidige staat",
+      "type": "table",
+      "gridPos": {"h": 10, "w": 24, "x": 0, "y": 0},
+      "datasource": {"type": "grafana-postgresql-datasource", "uid": "umh-timescaledb"},
+      "fieldConfig": {
+        "defaults": {
+          "custom": {"align": "auto", "cellOptions": {"type": "auto"}, "filterable": true}
+        },
+        "overrides": [
+          {"matcher": {"id": "byName", "options": "status"}, "properties": [{"id": "custom.cellOptions", "value": {"type": "color-text"}}, {"id": "color", "value": {"mode": "thresholds"}}]},
+          {"matcher": {"id": "byName", "options": "updated_at"}, "properties": [{"id": "unit", "value": "dateTimeAsIso"}]}
+        ]
+      },
+      "options": {"showHeader": true, "sortBy": [{"displayName": "order_id", "desc": false}]},
+      "targets": [
+        {
+          "datasource": {"type": "grafana-postgresql-datasource", "uid": "umh-timescaledb"},
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT order_id, customer_name, status, milestone, due_date, order_date, updated_at FROM erp_sales_order ORDER BY order_id;",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "title": "Sales Orders per Status",
+      "type": "piechart",
+      "gridPos": {"h": 8, "w": 8, "x": 0, "y": 10},
+      "datasource": {"type": "grafana-postgresql-datasource", "uid": "umh-timescaledb"},
+      "options": {"legend": {"displayMode": "table", "placement": "right"}, "pieType": "donut"},
+      "targets": [
+        {
+          "datasource": {"type": "grafana-postgresql-datasource", "uid": "umh-timescaledb"},
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT status, count(*) AS aantal FROM erp_sales_order GROUP BY status ORDER BY aantal DESC;",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "title": "Aantal Sales Orders",
+      "type": "stat",
+      "gridPos": {"h": 4, "w": 4, "x": 8, "y": 10},
+      "datasource": {"type": "grafana-postgresql-datasource", "uid": "umh-timescaledb"},
+      "options": {"colorMode": "background", "graphMode": "none", "textMode": "value"},
+      "fieldConfig": {"defaults": {"color": {"mode": "thresholds"}, "thresholds": {"steps": [{"color": "blue", "value": null}]}}},
+      "targets": [
+        {
+          "datasource": {"type": "grafana-postgresql-datasource", "uid": "umh-timescaledb"},
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT count(*) AS total FROM erp_sales_order;",
+          "refId": "A"
+        }
+      ]
+    }
+  ],
+  "schemaVersion": 39,
+  "tags": ["erp", "sessie-5"],
+  "templating": {"list": []},
+  "time": {"from": "now-24h", "to": "now"},
+  "title": "ERP — Sales Orders",
+  "uid": "erp-sales-orders"
+}
