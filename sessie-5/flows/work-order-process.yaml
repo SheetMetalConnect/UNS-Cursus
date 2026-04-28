@@ -27,7 +27,18 @@ pipeline:
         let action = $umh_topic.split(".").index(-1)
         root = if $action == "process" { this } else { deleted() }
 
-    # Asset ID opzoeken via ISA-95 locatie
+    # Normalize incoming types for reliable comparison
+    - bloblang: |
+        root = this
+        root.qty = this.qty.number().catch(0)
+        root.priority = if this.priority == null { null } else { this.priority.number().catch(null) }
+        root.due_date = if this.due_date == null || this.due_date == "" { null } else {
+          this.due_date.ts_parse("2006-01-02T15:04:05Z").catch(
+            this.due_date.ts_parse("2006-01-02").catch(null)
+          )
+        }
+
+    # Asset ID opzoeken via ISA-95 locatie (enterprise + site + area + line)
     - branch:
         processors:
           - bloblang: |
@@ -43,12 +54,14 @@ pipeline:
               dsn: ${DB_DSN}
               table: asset
               columns: [id]
-              where: enterprise = $1 AND site = $2
-              args_mapping: "[ this.enterprise, this.site ]"
+              where: enterprise = $1 AND site = $2 AND COALESCE(area,'') = COALESCE($3,'') AND COALESCE(line,'') = COALESCE($4,'')
+              args_mapping: "[ this.enterprise, this.site, this.area, this.line ]"
 
           - bloblang: |
               root.asset_id = if this.type() == "array" && this.length() > 0 {
                 this.index(0).id
+              } else if this.type() == "object" && this.id != null {
+                this.id
               } else {
                 null
               }
@@ -73,15 +86,25 @@ pipeline:
             this.index(0)
           }
 
+    # Normalize DB result types to match incoming
+    - bloblang: |
+        root = this
+        root.query = if this.query == "no_match" { "no_match" } else {
+          let q = this.query
+          $q.qty = $q.qty.number().catch(0)
+          $q.priority = if $q.priority == null { null } else { $q.priority.number().catch(null) }
+          $q
+        }
+
     # Vergelijken: create, update of duplicate?
     - bloblang: |
         let query = this.query
         root = this
         root.query = deleted()
-        let change_type = if root.order_nr == $query.order_nr && root.product == $query.product && root.qty == $query.qty && root.customer == $query.customer && root.priority == $query.priority && root.due_date == $query.due_date && root.status == $query.status {
-          "duplicate"
-        } else if $query == "no_match" {
+        let change_type = if $query == "no_match" {
           "create"
+        } else if root.order_nr == $query.order_nr && root.product == $query.product && root.qty == $query.qty && root.customer == $query.customer && root.priority == $query.priority && root.due_date.ts_format("2006-01-02").catch("") == $query.due_date.ts_format("2006-01-02").catch("") && root.status == $query.status {
+          "duplicate"
         } else {
           "update"
         }
