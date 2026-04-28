@@ -1,6 +1,13 @@
 order_id,customer_name,status,milestone,due_date,order_date
-SO-001,Metaaltechniek de Vries,Open,Open,2026-05-15,2026-04-20
-SO-002,Constructiebedrijf Jansen,Bevestigd,Bevestigd,2026-05-10,2026-04-18
-SO-003,Machinefabriek Bakker,Open,Open,2026-05-20,2026-04-22
-SO-004,Scheepswerf Rotterdam,Verzonden,Verzonden,2026-04-30,2026-04-10
-SO-005,Staalhandel Groot,Bevestigd,Bevestigd,2026-05-08,2026-04-15
+SO-2026-001,Metaalwerk BV,Open,Open,2026-05-15,2026-04-02
+SO-2026-002,Constructiebedrijf Jansen,Bevestigd,Bevestigd,2026-05-10,2026-04-05
+SO-2026-003,Tata Steel Nederland,Open,Open,2026-05-20,2026-04-08
+SO-2026-004,Scheepswerf Rotterdam,Verzonden,Verzonden,2026-05-01,2026-04-01
+SO-2026-005,Staalhandel Groot,Bevestigd,Bevestigd,2026-05-12,2026-04-07
+SO-2026-006,VDL Groep,Open,Open,2026-05-25,2026-04-10
+SO-2026-007,Aalberts Industries,Bevestigd,Bevestigd,2026-05-18,2026-04-12
+SO-2026-008,Machinefabriek Bakker,Open,Open,2026-06-01,2026-04-15
+SO-2026-009,Koninklijke Lankhorst,Verzonden,Verzonden,2026-05-08,2026-04-03
+SO-2026-010,Metaalwerk BV,Bevestigd,Bevestigd,2026-06-05,2026-04-18
+SO-2026-011,Tata Steel Nederland,Open,Open,2026-06-10,2026-04-20
+SO-2026-012,Scheepswerf Rotterdam,Gefactureerd,Gefactureerd,2026-05-05,2026-04-01
