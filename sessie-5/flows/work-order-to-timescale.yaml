@@ -30,6 +30,8 @@ pipeline:
         let action = meta("umh_topic").split(".").index(-1)
         root = if $action == "create" || $action == "update" { this } else { deleted() }
         meta action = $action
+    - bloblang: |
+        root = if this.order_nr == null || this.order_nr == "" { deleted() } else { this }
 
 output:
   sql_raw:

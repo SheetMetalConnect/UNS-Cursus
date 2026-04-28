@@ -4,7 +4,7 @@
 # Wat doet het:
 #   - HTTP POST endpoint op :8090/api/v1/
 #   - Ontvangt sales order data (vanuit Node-RED of elk ander systeem)
-#   - Routeert naar UNS topic umh.v1.smc.workshop._erp.sales_orders
+#   - Routeert naar UNS topic umh.v1.smc.vienna._erp.sales_orders
 #   - De sales-order-bridge (aparte flow) schrijft naar erp_sales_order tabel
 #
 # Deploy via: Management Console → Data Flows → Stand-alone → Add
@@ -33,7 +33,7 @@ input:
 pipeline:
   processors:
     - bloblang: |
-        meta umh_topic = "umh.v1.smc.workshop._erp.sales_orders"
+        meta umh_topic = "umh.v1.smc.vienna._erp.sales_orders"
         root.order_id = this.order_id.or("")
         root.customer_name = this.customer_name.or("")
         root.status = this.status.or("Open")

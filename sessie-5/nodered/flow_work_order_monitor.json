@@ -11,7 +11,7 @@
         "type": "mqtt in",
         "z": "tab-work-order-mon",
         "name": "Subscribe _work_order/#",
-        "topic": "umh/v1/smc/workshop/_work_order/#",
+        "topic": "umh/v1/smc/vienna/_work_order/#",
         "qos": "0",
         "datatype": "utf8",
         "broker": "s5m-mqtt-broker",

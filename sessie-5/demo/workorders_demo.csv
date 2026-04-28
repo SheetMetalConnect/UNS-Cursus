@@ -1,0 +1,6 @@
+order_nr,product,qty,customer,priority,due_date,status
+WO-101,BRACKET-A1,50,Metaaltechniek de Vries,2,2026-05-15,Nieuw
+WO-102,FLANGE-B2,120,Constructiebedrijf Jansen,1,2026-05-10,Nieuw
+WO-103,HOUSING-C3,80,Machinefabriek Bakker,1,2026-05-20,Nieuw
+WO-104,PANEL-D4,200,Scheepswerf Rotterdam,3,2026-04-30,Bezig
+WO-105,FRAME-E5,35,Staalhandel Groot,2,2026-05-08,Nieuw

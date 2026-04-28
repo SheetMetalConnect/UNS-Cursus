@@ -48,7 +48,7 @@
         "type": "function",
         "z": "tab-work-order-pub",
         "name": "NocoDB → MQTT payload",
-        "func": "var rows = msg.payload.list || [];\n\nvar messages = rows.map(function(r) {\n    return {\n        topic: \"umh/v1/smc/workshop/_work_order/process\",\n        payload: JSON.stringify({\n            order_nr: r.order_nr,\n            product: r.product || \"\",\n            qty: r.qty || 0,\n            customer: r.customer || \"\",\n            priority: r.priority || null,\n            due_date: r.due_date || null,\n            status: r.status || \"Nieuw\"\n        })\n    };\n});\n\nnode.status({text: rows.length + \" werkorders → MQTT\"});\nreturn [messages];",
+        "func": "var rows = msg.payload.list || [];\n\nvar messages = rows.map(function(r) {\n    return {\n        topic: \"umh/v1/smc/vienna/_work_order/process\",\n        payload: JSON.stringify({\n            order_nr: r.order_nr,\n            product: r.product || \"\",\n            qty: r.qty || 0,\n            customer: r.customer || \"\",\n            priority: r.priority || null,\n            due_date: r.due_date || null,\n            status: r.status || \"Nieuw\"\n        })\n    };\n});\n\nnode.status({text: rows.length + \" werkorders → MQTT\"});\nreturn [messages];",
         "outputs": 1,
         "timeout": "",
         "noerr": 0,
