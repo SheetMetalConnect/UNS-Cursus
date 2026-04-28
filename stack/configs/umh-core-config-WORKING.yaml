@@ -1,0 +1,693 @@
+templates:
+    protocolConverter:
+        Modbus-Les:
+            connection:
+                nmap:
+                    target: '{{ .IP }}'
+                    port: '{{ .PORT }}'
+            dataflowcomponent_read:
+                benthos:
+                    input:
+                        modbus:
+                            addresses:
+                                - address: 0
+                                  name: dc_power_w
+                                  register: holding
+                                  type: FLOAT32
+                                - address: 2
+                                  name: ac_power_w
+                                  register: holding
+                                  type: FLOAT32
+                                - address: 4
+                                  name: daily_yield_kwh
+                                  register: holding
+                                  type: FLOAT32
+                                - address: 8
+                                  name: dc_voltage_v
+                                  register: holding
+                                  type: FLOAT32
+                                - address: 10
+                                  name: dc_current_a
+                                  register: holding
+                                  type: FLOAT32
+                                - address: 12
+                                  name: panel_temperature_c
+                                  register: holding
+                                  type: FLOAT32
+                                - address: 14
+                                  name: inverter_status
+                                  register: holding
+                                  type: UINT32
+                                - address: 16
+                                  name: grid_frequency_hz
+                                  register: holding
+                                  type: FLOAT32
+                            byteOrder: ABCD
+                            controller: tcp://{{ .IP }}:{{ .PORT }}
+                            slaveIDs:
+                                - 1
+                            timeBetweenReads: 5s
+                            timeout: 3s
+                    pipeline:
+                        processors:
+                            - tag_processor:
+                                advancedProcessing: return msg;
+                                conditions:
+                                    - if: msg.meta.modbus_tag_name === "dc_power_w"
+                                      then: |
+                                        msg.meta.unit = "W";
+                                        msg.meta.virtual_path = "dc";
+                                        return msg;
+                                    - if: msg.meta.modbus_tag_name === "ac_power_w"
+                                      then: |
+                                        msg.meta.unit = "W";
+                                        msg.meta.virtual_path = "ac";
+                                        return msg;
+                                    - if: msg.meta.modbus_tag_name === "daily_yield_kwh"
+                                      then: |
+                                        msg.meta.unit = "kWh";
+                                        return msg;
+                                    - if: msg.meta.modbus_tag_name === "dc_voltage_v"
+                                      then: |
+                                        msg.meta.unit = "V";
+                                        msg.meta.virtual_path = "dc";
+                                        return msg;
+                                    - if: msg.meta.modbus_tag_name === "dc_current_a"
+                                      then: |
+                                        msg.meta.unit = "A";
+                                        msg.meta.virtual_path = "dc";
+                                        return msg;
+                                    - if: msg.meta.modbus_tag_name === "panel_temperature_c"
+                                      then: |
+                                        msg.meta.unit = "degC";
+                                        return msg;
+                                    - if: msg.meta.modbus_tag_name === "inverter_status"
+                                      then: |
+                                        // UINT32 status code — pass through as integer, no unit.
+                                        msg.payload = Number(msg.payload);
+                                        return msg;
+                                    - if: msg.meta.modbus_tag_name === "grid_frequency_hz"
+                                      then: |
+                                        msg.meta.unit = "Hz";
+                                        return msg;
+                                defaults: |
+                                    // Route solar inverter tags into the historian under the workshop energy path.
+                                    msg.meta.location_path = "{{ .location_path }}";
+                                    msg.meta.data_contract = "_raw";
+                                    msg.meta.tag_name = msg.meta.modbus_tag_name;
+                                    msg.payload = msg.payload;
+                                    msg.meta.virtual_path = "";
+
+                                    // Modbus doesn't carry timestamps — stamp on ingest.
+                                    msg.meta.timestamp_ms = Date.now();
+
+                                    return msg;
+                    buffer:
+                        none: {}
+        OPC-UA-Cursus:
+            connection:
+                nmap:
+                    target: '{{ .IP }}'
+                    port: '{{ .PORT }}'
+            dataflowcomponent_read:
+                benthos:
+                    input:
+                        opcua:
+                            endpoint: opc.tcp://{{ .IP }}:{{ .PORT }}
+                            nodeIDs:
+                                - ns=1;i=1
+                                - ns=1;i=2
+                                - ns=1;i=3
+                                - ns=1;i=4
+                                - ns=1;i=5
+                                - ns=1;i=6
+                                - ns=1;i=7
+                                - ns=1;i=8
+                                - ns=1;i=9
+                                - ns=1;i=10
+                            password: ""
+                            subscribeEnabled: true
+                            useHeartbeat: true
+                            username: ""
+                    pipeline:
+                        processors:
+                            - tag_processor:
+                                advancedProcessing: return msg;
+                                conditions:
+                                    - if: msg.meta.opcua_attr_nodeid === "ns=4;i=6211"
+                                      then: |
+                                        msg.payload = parseFloat(msg.payload) + 273.15;
+                                        msg.meta.tag_name = "CurrentTemperatureKelvin";
+                                        msg.meta.unit = "Kelvin";
+                                        return msg;
+                                defaults: |-
+                                    msg.meta.location_path = "{{ .location_path }}";
+                                    msg.meta.data_contract = "_historian";
+                                    msg.meta.tag_name = msg.meta.opcua_tag_name;
+                                    msg.payload = msg.payload;
+                                    msg.meta.virtual_path = msg.meta.opcua_tag_path;
+
+                                    // Set timestamp_ms from OPC-UA source timestamp
+                                    msg.meta.timestamp_ms = msg.meta.opcua_source_timestamp;
+
+                                    // Auto-generated from CSV table
+                                    switch(msg.meta.opcua_attr_nodeid) {
+                                    {{- range .AddressMappings }}
+                                      case "{{ .Address }}":
+                                        {{- if .LocationPathSuffix }}msg.meta.location_path += ".{{ .LocationPathSuffix }}";{{- end }}
+                                        {{- if .DataContract }}msg.meta.data_contract = "{{ .DataContract }}";{{- end }}
+                                        {{- if .VirtualPath }}msg.meta.virtual_path = "{{ .VirtualPath }}";{{- end }}
+                                        {{- if .TagName }}msg.meta.tag_name = "{{ .TagName }}";{{- end }}
+                                        break;
+                                    {{- end }}
+                                      default:
+                                        break;
+                                    }
+
+                                    return msg;
+                    buffer:
+                        none: {}
+    streamProcessor:
+        aantallen:
+            sources:
+                outcount: '{{ .location_path }}._raw.OutCount'
+            mapping:
+                count: source_alias
+            model:
+                name: machine-aantallen
+                version: v1
+agent:
+    location:
+        0: smc
+        1: vienna
+        2: ""
+        3: ""
+        4: ""
+        5: ""
+        6: ""
+    releaseChannel: stable
+    communicator:
+        apiUrl: https://management.umh.app/api
+        authToken: 15e1039538d68c273898dcc7761250fdb3caca8e9906d4420d0fcc9a262b9452
+    metricsPort: 8080
+    enableResourceLimitBlocking: true
+dataModels:
+    - version:
+        v1:
+            structure:
+                count:
+                    _payloadshape: timeseries-number
+      name: machine-aantallen
+dataContracts:
+    - name: _machine-aantallen_v1
+      model:
+        name: machine-aantallen
+        version: v1
+dataFlow:
+    - name: historian
+      desiredState: active
+      dataFlowComponentConfig:
+        benthos:
+            input:
+                uns:
+                    consumer_group: historian
+                    umh_topic: umh\.v1\..+\._raw\..+
+            pipeline:
+                processors:
+                    - bloblang: |-
+                        let umh_topic = meta("umh_topic")
+                        let parts = $umh_topic.split(".")
+
+                        # Zoek _raw positie (max 10 niveaus diep)
+                        let raw_idx = -1
+                        let raw_idx = if $parts.index(0).catch("") == "_raw" { 0 } else { $raw_idx }
+                        let raw_idx = if $parts.index(1).catch("") == "_raw" { 1 } else { $raw_idx }
+                        let raw_idx = if $parts.index(2).catch("") == "_raw" { 2 } else { $raw_idx }
+                        let raw_idx = if $parts.index(3).catch("") == "_raw" { 3 } else { $raw_idx }
+                        let raw_idx = if $parts.index(4).catch("") == "_raw" { 4 } else { $raw_idx }
+                        let raw_idx = if $parts.index(5).catch("") == "_raw" { 5 } else { $raw_idx }
+                        let raw_idx = if $parts.index(6).catch("") == "_raw" { 6 } else { $raw_idx }
+                        let raw_idx = if $parts.index(7).catch("") == "_raw" { 7 } else { $raw_idx }
+                        let raw_idx = if $parts.index(8).catch("") == "_raw" { 8 } else { $raw_idx }
+                        let raw_idx = if $parts.index(9).catch("") == "_raw" { 9 } else { $raw_idx }
+
+                        # Geen _raw gevonden → bericht weggooien
+                        root = if $raw_idx < 0 { deleted() } else { this }
+
+                        # Locatie = alles tussen "umh.v1." en "_raw"
+                        let loc_parts = $parts.slice(2, $raw_idx)
+                        # Tag = alles na "_raw"
+                        let tag_parts = $parts.slice($raw_idx + 1)
+
+                        meta tag_name   = $tag_parts.join(".")
+                        meta enterprise = $loc_parts.index(0).catch("")
+                        meta site       = $loc_parts.index(1).catch("")
+                        meta area       = $loc_parts.index(2).catch("")
+                        meta line       = $loc_parts.index(3).catch("")
+                        meta workcell   = $loc_parts.index(4).catch("")
+                        meta origin_id  = $loc_parts.index(5).catch("")
+                    - bloblang: |-
+                        let val = this.value.catch(this)
+                        let is_numeric = $val.type() == "number" || $val.type() == "bool" || ($val.type() == "string" && $val.re_match("^-?[0-9]+(\\.[0-9]+)?$"))
+
+                        meta is_numeric = if $is_numeric { "true" } else { "false" }
+
+                        root.tag_name = meta("tag_name")
+                        root.value = if $val.type() == "bool" { if $val { 1 } else { 0 } } else { $val }
+            output:
+                switch:
+                    cases:
+                        - check: meta("is_numeric") == "true"
+                          output:
+                            sql_raw:
+                                args_mapping: |
+                                    [ meta("enterprise"), meta("site"), meta("area"), meta("line"),
+                                      meta("workcell"), meta("origin_id"), this.tag_name, this.value.number() ]
+                                driver: postgres
+                                dsn: ${DB_DSN}
+                                max_in_flight: 64
+                                query: |
+                                    INSERT INTO tag (time, asset_id, tag_name, value, origin) VALUES (NOW(), get_asset_id($1, $2, $3, $4, $5, $6), $7, $8, 'uns')
+                        - output:
+                            sql_raw:
+                                args_mapping: |
+                                    [ meta("enterprise"), meta("site"), meta("area"), meta("line"),
+                                      meta("workcell"), meta("origin_id"), this.tag_name, this.value.string() ]
+                                driver: postgres
+                                dsn: ${DB_DSN}
+                                max_in_flight: 64
+                                query: |
+                                    INSERT INTO tag_string (time, asset_id, tag_name, value, origin) VALUES (NOW(), get_asset_id($1, $2, $3, $4, $5, $6), $7, $8, 'uns')
+            buffer:
+                none: {}
+      debug_level: false
+    - name: weather
+      desiredState: active
+      dataFlowComponentConfig:
+        benthos:
+            input:
+                generate:
+                    interval: 3s
+                    mapping: root = ""
+            pipeline:
+                processors:
+                    - http:
+                        url: http://95.217.14.139:8084/api/weather/current
+                        verb: GET
+                    - bloblang: |-
+                        let data = this
+                        root = [
+                          {"tag": "temperature_c",       "v": $data.temperature_c},
+                          {"tag": "humidity_pct",         "v": $data.humidity_pct},
+                          {"tag": "wind_speed_kmh",       "v": $data.wind_speed_kmh},
+                          {"tag": "cloud_cover_pct",      "v": $data.cloud_cover_pct},
+                          {"tag": "solar_irradiance_wm2", "v": $data.solar_irradiance_wm2},
+                          {"tag": "pressure_hpa",         "v": $data.pressure_hpa},
+                          {"tag": "uv_index",             "v": $data.uv_index}
+                        ]
+                    - unarchive:
+                        format: json_array
+                    - bloblang: |-
+                        meta umh_topic = "umh.v1.smc.vienna.weather._raw." + this.tag
+                        root.value = this.v
+                        root.timestamp_ms = now().ts_unix_milli()
+            output:
+                uns: {}
+            buffer:
+                none: {}
+            rate_limit_resources:
+                - label: http_limiter
+                  local:
+                    count: 1
+                    interval: 1s
+      debug_level: false
+    - name: api-sales-order
+      desiredState: active
+      dataFlowComponentConfig:
+        benthos:
+            input:
+                http_server:
+                    address: 0.0.0.0:8090
+                    allowed_verbs:
+                        - POST
+                    path: /api/v1/
+            pipeline:
+                processors:
+                    - bloblang: |
+                        meta umh_topic = "umh.v1.smc.vienna._erp.sales_orders"
+                        root.order_id = this.order_id.or("")
+                        root.customer_name = this.customer_name.or("")
+                        root.status = this.status.or("Open")
+                        root.milestone = this.milestone.or(this.status).or("Open")
+                        root.due_date = this.due_date.or(null)
+                        root.order_date = this.order_date.or(null)
+                        root.delivered_date = this.delivered_date.or(null)
+                        root.timestamp_ms = now().ts_unix_milli()
+            output:
+                uns: {}
+      debug_level: false
+    - name: sales-order-bridge
+      desiredState: active
+      dataFlowComponentConfig:
+        benthos:
+            input:
+                uns:
+                    consumer_group: sales_order_bridge
+                    umh_topic: umh\.v1\..*\._erp\.sales_orders
+            pipeline:
+                processors:
+                    - bloblang: |
+                        let topic = meta("umh_topic")
+                        root = if $topic.contains("_erp.sales_orders") { this } else { deleted() }
+                    - bloblang: |
+                        let topic = meta("umh_topic")
+                        let parts = $topic.split("_erp").index(0).split(".").slice(2, -1)
+                        meta enterprise = parts.index(0).catch("")
+                        meta site = parts.index(1).catch("")
+                        meta area = parts.index(2).catch("")
+                        meta line = parts.index(3).catch("")
+                        meta workcell = parts.index(4).catch("")
+                        meta origin_id = parts.index(5).catch("")
+                    - branch:
+                        processors:
+                            - sql_raw:
+                                driver: postgres
+                                dsn: ${DB_DSN}
+                                query: |
+                                    SELECT get_asset_id(
+                                      '${! meta("enterprise") }',
+                                      '${! meta("site").or("") }',
+                                      '${! meta("area").or("") }',
+                                      '${! meta("line").or("") }',
+                                      '${! meta("workcell").or("") }',
+                                      '${! meta("origin_id").or("") }'
+                                    ) AS id;
+                                unsafe_dynamic_query: true
+                        result_map: root.asset_id = this.index(0).id
+            output:
+                sql_raw:
+                    args_mapping: |
+                        [
+                          this.order_id,
+                          this.asset_id,
+                          this.customer_name,
+                          this.milestone,
+                          this.due_date,
+                          this.order_date,
+                          this.delivered_date,
+                          this.status
+                        ]
+                    driver: postgres
+                    dsn: ${DB_DSN}
+                    query: |
+                        INSERT INTO erp_sales_order (
+                          order_id, asset_id, customer_name, milestone,
+                          due_date, order_date, delivered_date, status, change_type
+                        )
+                        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'UPSERT')
+                        ON CONFLICT (order_id, asset_id) DO UPDATE SET
+                          customer_name = EXCLUDED.customer_name,
+                          milestone = EXCLUDED.milestone,
+                          due_date = EXCLUDED.due_date,
+                          order_date = EXCLUDED.order_date,
+                          delivered_date = EXCLUDED.delivered_date,
+                          status = EXCLUDED.status,
+                          updated_at = NOW();
+      debug_level: false
+    - name: mqtt-to-uns-bridge
+      desiredState: active
+      dataFlowComponentConfig:
+        benthos:
+            input:
+                mqtt:
+                    auto_replay_nacks: false
+                    client_id: cursus_mqtt_to_uns
+                    dynamic_client_id_suffix: nanoid
+                    topics:
+                        - umh/v1/+/_work_order/process
+                        - umh/v1/+/+/_work_order/process
+                        - umh/v1/+/+/+/_work_order/process
+                        - umh/v1/+/+/+/+/_work_order/process
+                        - umh/v1/+/+/+/+/+/_work_order/process
+                        - umh/v1/+/+/+/+/+/+/_work_order/process
+                    urls:
+                        - tcp://hivemq:1883
+            pipeline:
+                processors:
+                    - bloblang: |
+                        let mqtt_topic = meta("mqtt_topic").or("")
+                        root = if $mqtt_topic == "" { deleted() } else { this }
+                        meta umh_topic = $mqtt_topic.replace("/", ".")
+                        meta umh_key = $mqtt_topic.split("/").index(-1)
+            output:
+                uns: {}
+      debug_level: false
+    - name: work-order-process
+      desiredState: active
+      dataFlowComponentConfig:
+        benthos:
+            input:
+                uns:
+                    umh_topic: "umh\\.v1\\..*\\._work_order\\.process"
+                    consumer_group: work_order_process
+            pipeline:
+                processors:
+                    - bloblang: |
+                        let umh_topic = meta("umh_topic")
+                        let action = $umh_topic.split(".").index(-1)
+                        root = if $action == "process" { this } else { deleted() }
+                    - branch:
+                        processors:
+                            - bloblang: |
+                                let umh_topic = meta("umh_topic")
+                                let parts = $umh_topic.split("_work_order").index(0).split(".").slice(2)
+                                root.enterprise = $parts.index(0).catch("")
+                                root.site = $parts.index(1).catch("")
+                                root.area = $parts.index(2).catch("")
+                                root.line = $parts.index(3).catch("")
+                            - sql_select:
+                                driver: postgres
+                                dsn: ${DB_DSN}
+                                table: asset
+                                columns: [id]
+                                where: enterprise = $1 AND site = $2
+                                args_mapping: '[ this.enterprise, this.site ]'
+                            - bloblang: |
+                                root.asset_id = if this.type() == "array" && this.length() > 0 {
+                                  this.index(0).id
+                                } else {
+                                  null
+                                }
+                        result_map: root.asset_id = this.asset_id
+                    - bloblang: root = if this.asset_id != null { this } else { deleted() }
+                    - branch:
+                        processors:
+                            - sql_select:
+                                driver: postgres
+                                dsn: ${DB_DSN}
+                                table: erp_work_order
+                                columns: ['*']
+                                where: order_nr = $1 AND asset_id = $2
+                                args_mapping: '[ this.order_nr, this.asset_id ]'
+                        result_map: |
+                            root.query = if this.length() == 0 {
+                              "no_match"
+                            } else {
+                              this.index(0)
+                            }
+                    - bloblang: |
+                        let query = this.query
+                        root = this
+                        root.query = deleted()
+                        let change_type = if root.order_nr == $query.order_nr && root.product == $query.product && root.qty == $query.qty && root.customer == $query.customer && root.priority == $query.priority && root.due_date == $query.due_date && root.status == $query.status {
+                          "duplicate"
+                        } else if $query == "no_match" {
+                          "create"
+                        } else {
+                          "update"
+                        }
+                        meta umh_topic = meta("umh_topic").trim_suffix("process") + $change_type
+                        meta umh_key = $change_type
+            output:
+                uns: {}
+      debug_level: false
+    - name: work-order-to-timescale
+      desiredState: active
+      dataFlowComponentConfig:
+        benthos:
+            input:
+                uns:
+                    consumer_group: work_order_to_timescale
+                    umh_topics:
+                        - umh\.v1\..*\._work_order\.create
+                        - umh\.v1\..*\._work_order\.update
+            pipeline:
+                processors:
+                    - bloblang: |
+                        let action = meta("umh_topic").split(".").index(-1)
+                        root = if $action == "create" || $action == "update" { this } else { deleted() }
+                        meta action = $action
+                    - bloblang: |
+                        root = if this.order_nr == null || this.order_nr == "" { deleted() } else { this }
+            output:
+                sql_raw:
+                    args_mapping: |
+                        [
+                          this.order_nr,
+                          this.asset_id,
+                          this.product,
+                          this.qty,
+                          this.customer,
+                          this.priority,
+                          this.due_date,
+                          this.status,
+                          meta("action").uppercase()
+                        ]
+                    driver: postgres
+                    dsn: ${DB_DSN}
+                    max_in_flight: 20
+                    query: |
+                        WITH upserted AS (
+                          INSERT INTO erp_work_order (
+                            order_nr, asset_id, product, qty,
+                            customer, priority, due_date, status, change_type
+                          )
+                          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+                          ON CONFLICT (order_nr, asset_id) DO UPDATE SET
+                            product = EXCLUDED.product,
+                            qty = EXCLUDED.qty,
+                            customer = EXCLUDED.customer,
+                            priority = EXCLUDED.priority,
+                            due_date = EXCLUDED.due_date,
+                            status = EXCLUDED.status,
+                            change_type = EXCLUDED.change_type,
+                            updated_at = NOW()
+                          RETURNING *
+                        )
+                        INSERT INTO erp_work_order_history (
+                          order_nr, asset_id, product, qty,
+                          customer, priority, due_date, status, change_type
+                        )
+                        SELECT order_nr, asset_id, product, qty,
+                               customer, priority, due_date, status, change_type
+                        FROM upserted;
+      debug_level: false
+    - name: uns-to-mqtt-bridge
+      desiredState: active
+      dataFlowComponentConfig:
+        benthos:
+            input:
+                uns:
+                    consumer_group: cursus_uns_to_mqtt
+                    umh_topics:
+                        - umh\.v1\..*\._work_order\.(create|update|duplicate)
+            pipeline:
+                processors:
+                    - bloblang: |
+                        let umh_topic = meta("umh_topic")
+                        let action = $umh_topic.split(".").index(-1)
+                        meta mqtt_topic = $umh_topic.replace(".", "/")
+                        root = if $action == "create" || $action == "update" || $action == "duplicate" {
+                          this
+                        } else {
+                          deleted()
+                        }
+            output:
+                mqtt:
+                    client_id: cursus_uns_to_mqtt
+                    dynamic_client_id_suffix: nanoid
+                    topic: ${! meta("mqtt_topic") }
+                    urls:
+                        - tcp://hivemq:1883
+      debug_level: false
+protocolConverter:
+    - name: OPC-UA-Cursus
+      desiredState: active
+      protocolConverterServiceConfig:
+        variables:
+            AddressMappings:
+                - Address: ns=1;i=1
+                  DataContract: _raw
+                  LocationPathSuffix: ""
+                  TagName: State
+                  VirtualPath: ""
+                - Address: ns=1;i=2
+                  DataContract: _raw
+                  LocationPathSuffix: ""
+                  TagName: CycleCount
+                  VirtualPath: ""
+                - Address: ns=1;i=3
+                  DataContract: _raw
+                  LocationPathSuffix: ""
+                  TagName: CycleTimeMS
+                  VirtualPath: ""
+                - Address: ns=1;i=4
+                  DataContract: _raw
+                  LocationPathSuffix: ""
+                  TagName: ScrapCount
+                  VirtualPath: ""
+                - Address: ns=1;i=5
+                  DataContract: _raw
+                  LocationPathSuffix: ""
+                  TagName: InCount
+                  VirtualPath: ""
+                - Address: ns=1;i=6
+                  DataContract: _raw
+                  LocationPathSuffix: ""
+                  TagName: OutCount
+                  VirtualPath: ""
+                - Address: ns=1;i=7
+                  DataContract: _raw
+                  LocationPathSuffix: ""
+                  TagName: IsDownstreamBlocked
+                  VirtualPath: ""
+                - Address: ns=1;i=8
+                  DataContract: _raw
+                  LocationPathSuffix: ""
+                  TagName: DownTimeSec
+                  VirtualPath: ""
+                - Address: ns=1;i=9
+                  DataContract: _raw
+                  LocationPathSuffix: ""
+                  TagName: RunTimeSec
+                  VirtualPath: ""
+                - Address: ns=1;i=10
+                  DataContract: _raw
+                  LocationPathSuffix: ""
+                  TagName: PlannedCycleTimeMS
+                  VirtualPath: ""
+            IP: 95.217.14.139
+            PORT: "4840"
+        location:
+            "0": smc
+            "1": vienna
+            "2": machining
+        templateRef: OPC-UA-Cursus
+        readDFCDesiredState: active
+      debug_level: false
+    - name: Modbus-Les
+      desiredState: active
+      protocolConverterServiceConfig:
+        variables:
+            IP: 95.217.14.139
+            PORT: "5020"
+        location:
+            "0": smc
+            "1": vienna
+            "2": solar
+        templateRef: Modbus-Les
+        readDFCDesiredState: active
+      debug_level: false
+streamProcessor:
+    - streamProcessorServiceConfig:
+        location:
+            "0": smc
+            "1": vienna
+        templateRef: aantallen
+      name: aantallen
+      desiredState: active
+internal:
+    topicbrowser:
+        desiredState: active
+    redpanda:
+        desiredState: active
