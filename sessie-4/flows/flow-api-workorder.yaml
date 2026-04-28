@@ -3,7 +3,7 @@
 # Wat doet het:
 #   - HTTP POST endpoint op :8090/api/v1/
 #   - Ontvangt werkorder events (order.created, order.progress, order.closed)
-#   - Routeert naar UNS topic umh.v1.smc.workshop._erp.orders
+#   - Routeert naar UNS topic umh.v1.smc.vienna._erp.orders
 #   - De erp-order-bridge (aparte flow) schrijft naar production_orders tabel
 #
 # Deploy via: Management Console → Data Flows → Stand-alone → Add
@@ -42,7 +42,7 @@ pipeline:
           const lineId = msg.payload.line_id || '';
 
           if (eventType === 'order.created') {
-              msg.meta.umh_topic = "umh.v1.smc.workshop._erp.orders";
+              msg.meta.umh_topic = "umh.v1.smc.vienna._erp.orders";
               msg.payload = {
                   orderId: data.id || data.order_id || '',
                   partNumber: data.product_id || '',
@@ -56,7 +56,7 @@ pipeline:
                   type: "production_order"
               };
           } else if (eventType === 'order.progress') {
-              msg.meta.umh_topic = "umh.v1.smc.workshop._erp.orders";
+              msg.meta.umh_topic = "umh.v1.smc.vienna._erp.orders";
               msg.payload = {
                   orderId: data.id || data.order_id || '',
                   partNumber: data.product_id || '',
@@ -73,7 +73,7 @@ pipeline:
                   type: "order_progress"
               };
           } else if (eventType === 'order.closed') {
-              msg.meta.umh_topic = "umh.v1.smc.workshop._erp.orders";
+              msg.meta.umh_topic = "umh.v1.smc.vienna._erp.orders";
               msg.payload = {
                   orderId: data.id || data.order_id || '',
                   partNumber: data.product_id || '',
@@ -89,7 +89,7 @@ pipeline:
                   type: "production_order"
               };
           } else {
-              msg.meta.umh_topic = "umh.v1.smc.workshop._erp.unknown";
+              msg.meta.umh_topic = "umh.v1.smc.vienna._erp.unknown";
               msg.payload.timestamp_ms = Date.now();
           }
 

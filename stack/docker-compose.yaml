@@ -26,7 +26,7 @@ services:
       - AUTH_TOKEN=${AUTH_TOKEN}
       - RELEASE_CHANNEL=stable
       - LOCATION_0=${LOCATION_0:-smc}
-      - LOCATION_1=${LOCATION_1:-workshop}
+      - LOCATION_1=${LOCATION_1:-vienna}
       - API_URL=https://management.umh.app/api
       - DB_DSN=postgres://kafkatopostgresqlv2:umhcore@timescaledb:5432/umh?sslmode=disable
 

@@ -32,11 +32,6 @@ pipeline:
         root = this
         root.qty = this.qty.number().catch(0)
         root.priority = if this.priority == null { null } else { this.priority.number().catch(null) }
-        root.due_date = if this.due_date == null || this.due_date == "" { null } else {
-          this.due_date.ts_parse("2006-01-02T15:04:05Z").catch(
-            this.due_date.ts_parse("2006-01-02").catch(null)
-          )
-        }
 
     # Asset ID opzoeken via ISA-95 locatie (enterprise + site + area + line)
     - branch:
@@ -86,24 +81,16 @@ pipeline:
             this.index(0)
           }
 
-    # Normalize DB result types to match incoming
-    - bloblang: |
-        root = this
-        root.query = if this.query == "no_match" { "no_match" } else {
-          let q = this.query
-          $q.qty = $q.qty.number().catch(0)
-          $q.priority = if $q.priority == null { null } else { $q.priority.number().catch(null) }
-          $q
-        }
-
     # Vergelijken: create, update of duplicate?
     - bloblang: |
         let query = this.query
         root = this
         root.query = deleted()
+        let due_in = root.due_date.string().catch("null").split("T").index(0).split(" ").index(0)
+        let due_db = $query.due_date.string().catch("null").split("T").index(0).split(" ").index(0)
         let change_type = if $query == "no_match" {
           "create"
-        } else if root.order_nr == $query.order_nr && root.product == $query.product && root.qty == $query.qty && root.customer == $query.customer && root.priority == $query.priority && root.due_date.ts_format("2006-01-02").catch("") == $query.due_date.ts_format("2006-01-02").catch("") && root.status == $query.status {
+        } else if root.order_nr == $query.order_nr && root.product == $query.product && root.qty == $query.qty.number().catch(0) && root.customer == $query.customer && root.priority.number().catch(-1) == $query.priority.number().catch(-1) && $due_in == $due_db && root.status == $query.status {
           "duplicate"
         } else {
           "update"

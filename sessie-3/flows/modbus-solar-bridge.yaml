@@ -43,7 +43,7 @@ pipeline:
   processors:
   - bloblang: 'let tag = meta("modbus_tag_name").or("unknown")
 
-      meta umh_topic = "umh.v1.smc.workshop.energy.solar._raw." + $tag
+      meta umh_topic = "umh.v1.smc.vienna.energy.solar._raw." + $tag
 
       root.value = content().string().number().catch(content().string())
 

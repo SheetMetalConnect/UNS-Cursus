@@ -26,8 +26,8 @@ pipeline:
         let rows = this.data.rows.or([])
         root = if $rows.length() == 0 { deleted() } else { this }
 
-        meta umh_topic = "umh.v1.smc.workshop.ERP.nocodb._raw.werkorder"
-        meta location_path = "ERP.nocodb"
+        meta umh_topic = "umh.v1.smc.vienna._raw.werkorder"
+        meta location_path = ""
         meta data_contract = "_raw"
         meta tag_name = "werkorder"
         root = $rows.index(0)

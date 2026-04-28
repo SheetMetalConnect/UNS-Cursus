@@ -11,16 +11,16 @@
 #   3. Save & Deploy
 #
 # API:         http://95.217.14.139:8084/api/weather/current
-# Locatie:     smc.workshop.weather
+# Locatie:     smc.vienna.weather
 #
 # Wat je ziet in de Topic Browser na deploy:
-#   umh.v1.smc.workshop.weather._raw.temperature_c      (°C)
-#   umh.v1.smc.workshop.weather._raw.humidity_pct        (%)
-#   umh.v1.smc.workshop.weather._raw.wind_speed_kmh      (km/h)
-#   umh.v1.smc.workshop.weather._raw.cloud_cover_pct     (%)
-#   umh.v1.smc.workshop.weather._raw.solar_irradiance_wm2 (W/m²)
-#   umh.v1.smc.workshop.weather._raw.pressure_hpa        (hPa)
-#   umh.v1.smc.workshop.weather._raw.uv_index            (0-11)
+#   umh.v1.smc.vienna.weather._raw.temperature_c      (°C)
+#   umh.v1.smc.vienna.weather._raw.humidity_pct        (%)
+#   umh.v1.smc.vienna.weather._raw.wind_speed_kmh      (km/h)
+#   umh.v1.smc.vienna.weather._raw.cloud_cover_pct     (%)
+#   umh.v1.smc.vienna.weather._raw.solar_irradiance_wm2 (W/m²)
+#   umh.v1.smc.vienna.weather._raw.pressure_hpa        (hPa)
+#   umh.v1.smc.vienna.weather._raw.uv_index            (0-11)
 # =============================================================================
 
 input:
@@ -53,7 +53,7 @@ pipeline:
 
     # Stap 3: Zet UNS topic per tag
     - bloblang: |
-        meta umh_topic = "umh.v1.smc.workshop.weather._raw." + this.tag
+        meta umh_topic = "umh.v1.smc.vienna.weather._raw." + this.tag
         root.value = this.v
         root.timestamp_ms = now().ts_unix_milli()
 
