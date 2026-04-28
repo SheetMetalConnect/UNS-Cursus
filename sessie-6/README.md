@@ -34,3 +34,39 @@
 | 1 | Hoeveel stroom leveren mijn panelen morgen? | ARIMA_PLUS forecast | Solar power |
 | 2 | Draait mijn machine normaal? | Anomaly detection | Machine runtimes |
 | 3 | Welk weer bepaalt mijn opbrengst? | Linear regression | Weer + solar |
+
+## MCP Servers (Claude Desktop integratie)
+
+| Server | Wat het doet |
+|--------|-------------|
+| `mcp-servers/uns-timescaledb` | Claude bevraagt je fabrieksdatabase |
+| `mcp-servers/uns-mqtt` | Claude publiceert/leest MQTT berichten |
+
+Setup: zie `mcp-servers/README.md`
+
+### Claude Desktop config
+
+```json
+{
+  "mcpServers": {
+    "uns-timescaledb": {
+      "command": "uv",
+      "args": ["--directory", "<pad-naar-repo>/mcp-servers/uns-timescaledb", "run", "src/server.py"],
+      "env": { "DATABASE_URL": "postgresql://grafanareader:changeme@localhost:5432/umh" }
+    },
+    "uns-mqtt": {
+      "command": "uv",
+      "args": ["--directory", "<pad-naar-repo>/mcp-servers/uns-mqtt", "run", "src/server.py"],
+      "env": { "MQTT_HOST": "localhost", "MQTT_PORT": "1883" }
+    }
+  }
+}
+```
+
+### Voorbeeldvragen voor Claude Desktop
+
+- "Welke assets heb ik in mijn fabriek?"
+- "Toon de laatste 10 sensormetingen van de machining lijn"
+- "Hoeveel werkorders staan er open en welke hebben prioriteit 1?"
+- "Wat is de gemiddelde cyclustijd van de afgelopen 24 uur?"
+- "Publiceer een test werkorder naar MQTT"
