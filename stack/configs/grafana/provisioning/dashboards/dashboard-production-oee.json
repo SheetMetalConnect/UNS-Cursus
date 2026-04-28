@@ -1,0 +1,310 @@
+{
+  "id": null,
+  "uid": "prod-machining-oee",
+  "title": "Productie \u2014 Machining OEE",
+  "tags": ["oee", "machining", "smc"],
+  "timezone": "Europe/Amsterdam",
+  "schemaVersion": 38,
+  "version": 1,
+  "refresh": "10s",
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "CycleCount",
+      "gridPos": { "x": 0, "y": 0, "w": 5, "h": 4 },
+      "datasource": { "type": "grafana-postgresql-datasource", "uid": "umh-timescaledb" },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "none"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "fixed", "fixedColor": "#73BF69" },
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{ "color": "#73BF69", "value": null }]
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "datasource": { "type": "grafana-postgresql-datasource", "uid": "umh-timescaledb" },
+          "rawSql": "SELECT time AS time, value FROM tag WHERE asset_id = 5 AND tag_name = 'CycleCount' AND $__timeFilter(time) ORDER BY time DESC LIMIT 1",
+          "format": "time_series",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "InCount",
+      "gridPos": { "x": 5, "y": 0, "w": 5, "h": 4 },
+      "datasource": { "type": "grafana-postgresql-datasource", "uid": "umh-timescaledb" },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "none"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "fixed", "fixedColor": "#73BF69" },
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{ "color": "#73BF69", "value": null }]
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "datasource": { "type": "grafana-postgresql-datasource", "uid": "umh-timescaledb" },
+          "rawSql": "SELECT time AS time, value FROM tag WHERE asset_id = 5 AND tag_name = 'InCount' AND $__timeFilter(time) ORDER BY time DESC LIMIT 1",
+          "format": "time_series",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "ScrapCount",
+      "gridPos": { "x": 10, "y": 0, "w": 5, "h": 4 },
+      "datasource": { "type": "grafana-postgresql-datasource", "uid": "umh-timescaledb" },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "none"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "fixed", "fixedColor": "#F2495C" },
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "#73BF69", "value": null },
+              { "color": "#FF9830", "value": 50 },
+              { "color": "#F2495C", "value": 100 }
+            ]
+          },
+          "mappings": []
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "datasource": { "type": "grafana-postgresql-datasource", "uid": "umh-timescaledb" },
+          "rawSql": "SELECT time AS time, value FROM tag WHERE asset_id = 5 AND tag_name = 'ScrapCount' AND $__timeFilter(time) ORDER BY time DESC LIMIT 1",
+          "format": "time_series",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Machine State",
+      "gridPos": { "x": 15, "y": 0, "w": 9, "h": 4 },
+      "datasource": { "type": "grafana-postgresql-datasource", "uid": "umh-timescaledb" },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "background",
+        "graphMode": "none"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{ "color": "#73BF69", "value": null }]
+          },
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "RUNNING": { "color": "#73BF69", "index": 0 },
+                "STOPPED": { "color": "#F2495C", "index": 1 },
+                "IDLE": { "color": "#FF9830", "index": 2 },
+                "ERROR": { "color": "#F2495C", "index": 3 }
+              }
+            }
+          ]
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "datasource": { "type": "grafana-postgresql-datasource", "uid": "umh-timescaledb" },
+          "rawSql": "SELECT time AS time, value FROM tag_string WHERE asset_id = 5 AND tag_name = 'State' AND $__timeFilter(time) ORDER BY time DESC LIMIT 1",
+          "format": "time_series",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "Beschikbaarheid — RunTime vs DownTime",
+      "gridPos": { "x": 0, "y": 4, "w": 24, "h": 8 },
+      "datasource": { "type": "grafana-postgresql-datasource", "uid": "umh-timescaledb" },
+      "options": {
+        "tooltip": { "mode": "multi", "sort": "none" },
+        "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 15,
+            "gradientMode": "opacity",
+            "spanNulls": false
+          }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "RunTimeSec" },
+            "properties": [
+              { "id": "color", "value": { "mode": "fixed", "fixedColor": "#73BF69" } },
+              { "id": "displayName", "value": "Run Time (s)" }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "DownTimeSec" },
+            "properties": [
+              { "id": "color", "value": { "mode": "fixed", "fixedColor": "#F2495C" } },
+              { "id": "displayName", "value": "Down Time (s)" }
+            ]
+          }
+        ]
+      },
+      "targets": [
+        {
+          "datasource": { "type": "grafana-postgresql-datasource", "uid": "umh-timescaledb" },
+          "rawSql": "SELECT time AS time, value AS \"RunTimeSec\" FROM tag WHERE asset_id = 5 AND tag_name = 'RunTimeSec' AND $__timeFilter(time) ORDER BY time",
+          "format": "time_series",
+          "refId": "A"
+        },
+        {
+          "datasource": { "type": "grafana-postgresql-datasource", "uid": "umh-timescaledb" },
+          "rawSql": "SELECT time AS time, value AS \"DownTimeSec\" FROM tag WHERE asset_id = 5 AND tag_name = 'DownTimeSec' AND $__timeFilter(time) ORDER BY time",
+          "format": "time_series",
+          "refId": "B"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "Cyclustijd — Werkelijk vs Gepland",
+      "gridPos": { "x": 0, "y": 12, "w": 24, "h": 8 },
+      "datasource": { "type": "grafana-postgresql-datasource", "uid": "umh-timescaledb" },
+      "options": {
+        "tooltip": { "mode": "multi", "sort": "none" },
+        "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "gradientMode": "opacity",
+            "spanNulls": false
+          }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "CycleTimeMS" },
+            "properties": [
+              { "id": "color", "value": { "mode": "fixed", "fixedColor": "#5794F2" } },
+              { "id": "displayName", "value": "Cyclustijd Werkelijk (ms)" }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "PlannedCycleTimeMS" },
+            "properties": [
+              { "id": "color", "value": { "mode": "fixed", "fixedColor": "#FF9830" } },
+              { "id": "displayName", "value": "Cyclustijd Gepland (ms)" },
+              {
+                "id": "custom.lineStyle",
+                "value": { "fill": "dash", "dash": [8, 4] }
+              }
+            ]
+          }
+        ]
+      },
+      "targets": [
+        {
+          "datasource": { "type": "grafana-postgresql-datasource", "uid": "umh-timescaledb" },
+          "rawSql": "SELECT time AS time, value AS \"CycleTimeMS\" FROM tag WHERE asset_id = 5 AND tag_name = 'CycleTimeMS' AND $__timeFilter(time) ORDER BY time",
+          "format": "time_series",
+          "refId": "A"
+        },
+        {
+          "datasource": { "type": "grafana-postgresql-datasource", "uid": "umh-timescaledb" },
+          "rawSql": "SELECT time AS time, value AS \"PlannedCycleTimeMS\" FROM tag WHERE asset_id = 5 AND tag_name = 'PlannedCycleTimeMS' AND $__timeFilter(time) ORDER BY time",
+          "format": "time_series",
+          "refId": "B"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "type": "gauge",
+      "title": "Downstream Geblokkeerd",
+      "gridPos": { "x": 0, "y": 20, "w": 24, "h": 6 },
+      "datasource": { "type": "grafana-postgresql-datasource", "uid": "umh-timescaledb" },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "orientation": "auto",
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 2000,
+          "max": 3000,
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "#73BF69", "value": null },
+              { "color": "#FF9830", "value": 2500 },
+              { "color": "#F2495C", "value": 2800 }
+            ]
+          },
+          "displayName": "IsDownstreamBlocked"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "datasource": { "type": "grafana-postgresql-datasource", "uid": "umh-timescaledb" },
+          "rawSql": "SELECT time AS time, value FROM tag WHERE asset_id = 5 AND tag_name = 'IsDownstreamBlocked' AND $__timeFilter(time) ORDER BY time DESC LIMIT 1",
+          "format": "time_series",
+          "refId": "A"
+        }
+      ]
+    }
+  ]
+}

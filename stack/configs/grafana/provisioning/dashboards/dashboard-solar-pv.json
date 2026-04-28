@@ -1,0 +1,386 @@
+{
+  "id": null,
+  "uid": "solar-pv-smc-vienna",
+  "title": "Energie \u2014 Solar PV",
+  "description": "Solar PV monitoring for asset smc.vienna.solar (asset_id=7)",
+  "tags": ["solar", "energy", "pv", "smc", "vienna"],
+  "timezone": "Europe/Amsterdam",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "10s",
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "timepicker": {},
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Dagelijkse Opbrengst",
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
+      "datasource": { "type": "grafana-postgresql-datasource", "uid": "umh-timescaledb" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "kwatth",
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "orange", "value": null },
+              { "color": "yellow", "value": 2 },
+              { "color": "green", "value": 4 }
+            ]
+          },
+          "mappings": []
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "text": { "valueSize": 40 }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "grafana-postgresql-datasource", "uid": "umh-timescaledb" },
+          "rawSql": "SELECT time, value FROM tag WHERE asset_id = 7 AND tag_name = 'daily_yield_kwh' AND $__timeFilter(time) ORDER BY time",
+          "format": "time_series"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "AC Vermogen",
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 },
+      "datasource": { "type": "grafana-postgresql-datasource", "uid": "umh-timescaledb" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "watt",
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "dark-orange", "value": null },
+              { "color": "orange", "value": 1000 },
+              { "color": "yellow", "value": 3000 },
+              { "color": "green", "value": 5000 }
+            ]
+          },
+          "mappings": []
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "text": { "valueSize": 40 }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "grafana-postgresql-datasource", "uid": "umh-timescaledb" },
+          "rawSql": "SELECT time, value FROM tag WHERE asset_id = 7 AND tag_name = 'ac.ac_power_w' AND $__timeFilter(time) ORDER BY time",
+          "format": "time_series"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Paneel Temperatuur",
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 0 },
+      "datasource": { "type": "grafana-postgresql-datasource", "uid": "umh-timescaledb" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "celsius",
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "blue", "value": null },
+              { "color": "yellow", "value": 40 },
+              { "color": "orange", "value": 50 },
+              { "color": "red", "value": 60 }
+            ]
+          },
+          "mappings": []
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "text": { "valueSize": 40 }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "grafana-postgresql-datasource", "uid": "umh-timescaledb" },
+          "rawSql": "SELECT time, value FROM tag WHERE asset_id = 7 AND tag_name = 'panel_temperature_c' AND $__timeFilter(time) ORDER BY time",
+          "format": "time_series"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Netfrequentie",
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 0 },
+      "datasource": { "type": "grafana-postgresql-datasource", "uid": "umh-timescaledb" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "hertz",
+          "decimals": 2,
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "yellow", "value": 49.8 },
+              { "color": "green", "value": 49.9 },
+              { "color": "yellow", "value": 50.1 },
+              { "color": "red", "value": 50.2 }
+            ]
+          },
+          "mappings": []
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "text": { "valueSize": 40 }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "grafana-postgresql-datasource", "uid": "umh-timescaledb" },
+          "rawSql": "SELECT time, value FROM tag WHERE asset_id = 7 AND tag_name = 'grid_frequency_hz' AND $__timeFilter(time) ORDER BY time",
+          "format": "time_series"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "AC / DC Vermogen",
+      "description": "AC output power vs DC input power from solar panels",
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 4 },
+      "datasource": { "type": "grafana-postgresql-datasource", "uid": "umh-timescaledb" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "watt",
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 15,
+            "gradientMode": "opacity",
+            "spanNulls": false,
+            "showPoints": "never",
+            "lineInterpolation": "smooth"
+          },
+          "color": { "mode": "palette-classic" }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "AC Vermogen (W)" },
+            "properties": [
+              { "id": "color", "value": { "fixedColor": "#FF9900", "mode": "fixed" } }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "DC Vermogen (W)" },
+            "properties": [
+              { "id": "color", "value": { "fixedColor": "#FFCC00", "mode": "fixed" } }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "tooltip": { "mode": "multi", "sort": "none" },
+        "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "grafana-postgresql-datasource", "uid": "umh-timescaledb" },
+          "rawSql": "SELECT time_bucket('1 minute', time) AS time, avg(value) AS \"AC Vermogen (W)\" FROM tag WHERE asset_id = 7 AND tag_name = 'ac.ac_power_w' AND $__timeFilter(time) GROUP BY 1 ORDER BY 1",
+          "format": "time_series"
+        },
+        {
+          "refId": "B",
+          "datasource": { "type": "grafana-postgresql-datasource", "uid": "umh-timescaledb" },
+          "rawSql": "SELECT time_bucket('1 minute', time) AS time, avg(value) AS \"DC Vermogen (W)\" FROM tag WHERE asset_id = 7 AND tag_name = 'dc.dc_power_w' AND $__timeFilter(time) GROUP BY 1 ORDER BY 1",
+          "format": "time_series"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "DC Spanning & Stroom",
+      "description": "DC voltage (V) and DC current (A) from solar array",
+      "gridPos": { "h": 9, "w": 14, "x": 0, "y": 14 },
+      "datasource": { "type": "grafana-postgresql-datasource", "uid": "umh-timescaledb" },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "spanNulls": false,
+            "showPoints": "never",
+            "lineInterpolation": "smooth"
+          },
+          "color": { "mode": "palette-classic" }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "DC Spanning (V)" },
+            "properties": [
+              { "id": "unit", "value": "volt" },
+              { "id": "color", "value": { "fixedColor": "#FF6600", "mode": "fixed" } },
+              { "id": "custom.axisPlacement", "value": "left" },
+              { "id": "custom.axisLabel", "value": "Spanning (V)" }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "DC Stroom (A)" },
+            "properties": [
+              { "id": "unit", "value": "amp" },
+              { "id": "color", "value": { "fixedColor": "#FFAA00", "mode": "fixed" } },
+              { "id": "custom.axisPlacement", "value": "right" },
+              { "id": "custom.axisLabel", "value": "Stroom (A)" }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "tooltip": { "mode": "multi", "sort": "none" },
+        "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "grafana-postgresql-datasource", "uid": "umh-timescaledb" },
+          "rawSql": "SELECT time_bucket('1 minute', time) AS time, avg(value) AS \"DC Spanning (V)\" FROM tag WHERE asset_id = 7 AND tag_name = 'dc.dc_voltage_v' AND $__timeFilter(time) GROUP BY 1 ORDER BY 1",
+          "format": "time_series"
+        },
+        {
+          "refId": "B",
+          "datasource": { "type": "grafana-postgresql-datasource", "uid": "umh-timescaledb" },
+          "rawSql": "SELECT time_bucket('1 minute', time) AS time, avg(value) AS \"DC Stroom (A)\" FROM tag WHERE asset_id = 7 AND tag_name = 'dc.dc_current_a' AND $__timeFilter(time) GROUP BY 1 ORDER BY 1",
+          "format": "time_series"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "Paneel Temperatuur",
+      "description": "Solar panel surface temperature over time",
+      "gridPos": { "h": 9, "w": 10, "x": 14, "y": 14 },
+      "datasource": { "type": "grafana-postgresql-datasource", "uid": "umh-timescaledb" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "celsius",
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 20,
+            "gradientMode": "opacity",
+            "spanNulls": false,
+            "showPoints": "never",
+            "lineInterpolation": "smooth"
+          },
+          "color": { "mode": "fixed", "fixedColor": "#E05F00" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "yellow", "value": null },
+              { "color": "orange", "value": 50 },
+              { "color": "red", "value": 60 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "tooltip": { "mode": "single", "sort": "none" },
+        "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "grafana-postgresql-datasource", "uid": "umh-timescaledb" },
+          "rawSql": "SELECT time_bucket('1 minute', time) AS time, avg(value) AS \"Temperatuur (°C)\" FROM tag WHERE asset_id = 7 AND tag_name = 'panel_temperature_c' AND $__timeFilter(time) GROUP BY 1 ORDER BY 1",
+          "format": "time_series"
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "type": "gauge",
+      "title": "Netfrequentie",
+      "description": "Grid frequency — nominal 50 Hz. Green: 49.9-50.1, Yellow: 49.8-50.2, Red: outside range",
+      "gridPos": { "h": 9, "w": 24, "x": 0, "y": 23 },
+      "datasource": { "type": "grafana-postgresql-datasource", "uid": "umh-timescaledb" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "hertz",
+          "decimals": 3,
+          "min": 49.5,
+          "max": 50.5,
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "yellow", "value": 49.8 },
+              { "color": "green", "value": 49.9 },
+              { "color": "yellow", "value": 50.1 },
+              { "color": "red", "value": 50.2 }
+            ]
+          },
+          "mappings": []
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "orientation": "auto",
+        "showThresholdLabels": true,
+        "showThresholdMarkers": true,
+        "minVizHeight": 75,
+        "minVizWidth": 75
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "grafana-postgresql-datasource", "uid": "umh-timescaledb" },
+          "rawSql": "SELECT time, value FROM tag WHERE asset_id = 7 AND tag_name = 'grid_frequency_hz' AND $__timeFilter(time) ORDER BY time",
+          "format": "time_series"
+        }
+      ]
+    }
+  ]
+}
