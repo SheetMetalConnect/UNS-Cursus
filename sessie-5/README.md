@@ -42,3 +42,16 @@
 Vervang in de polling flows:
 - `TABLE_ID_HIER` → je NocoDB Table ID
 - `XC_TOKEN_HIER` → je NocoDB API Token
+
+## Topic paden
+
+De flows gebruiken `umh/v1/smc/vienna/` als locatie. Pas dit aan naar je eigen ISA-95 hiërarchie:
+- `smc` → je enterprise naam (uit Management Console)
+- `vienna` → je site naam (uit Management Console)
+
+De bridge flows (in `flows/`) gebruiken wildcards en werken met elke locatie.
+
+## Vereisten
+
+- Asset moet bestaan in de `asset` tabel met matchende `enterprise` + `site` kolommen
+- De bridge flows moeten gedeployed zijn via de Management Console (Stand-alone → Add)
