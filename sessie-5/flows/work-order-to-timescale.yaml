@@ -1,0 +1,75 @@
+# ==============================================================================
+# Work Order → TimescaleDB (Persistence + History)
+# ==============================================================================
+# Slaat .create en .update berichten op in twee tabellen:
+#
+#   1. erp_work_order          — huidige staat (upsert op order_nr + asset_id)
+#   2. erp_work_order_history  — audit trail (elke wijziging wordt bewaard)
+#
+# Dit gebeurt in een enkele SQL query (CTE):
+#   INSERT → ON CONFLICT UPDATE → RETURNING → INSERT history
+#
+# Waarom history? Stel je klant belt: "wanneer is mijn werkorder van Nieuw
+# naar Klaar gegaan?" Met de history tabel kun je dat terugzoeken.
+#
+# Deploy via: Management Console → Data Flows → Stand-alone → Add
+# Naam: work-order-to-timescale
+# Deploy NADAT work-order-process actief is
+# ==============================================================================
+
+input:
+  uns:
+    umh_topics:
+      - "umh\\.v1\\..*\\._work_order\\.create"
+      - "umh\\.v1\\..*\\._work_order\\.update"
+    consumer_group: work_order_to_timescale
+
+pipeline:
+  processors:
+    - bloblang: |
+        let action = meta("umh_topic").split(".").index(-1)
+        root = if $action == "create" || $action == "update" { this } else { deleted() }
+        meta action = $action
+
+output:
+  sql_raw:
+    driver: postgres
+    dsn: ${DB_DSN}
+    query: |
+      WITH upserted AS (
+        INSERT INTO erp_work_order (
+          order_nr, asset_id, product, qty,
+          customer, priority, due_date, status, change_type
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+        ON CONFLICT (order_nr, asset_id) DO UPDATE SET
+          product = EXCLUDED.product,
+          qty = EXCLUDED.qty,
+          customer = EXCLUDED.customer,
+          priority = EXCLUDED.priority,
+          due_date = EXCLUDED.due_date,
+          status = EXCLUDED.status,
+          change_type = EXCLUDED.change_type,
+          updated_at = NOW()
+        RETURNING *
+      )
+      INSERT INTO erp_work_order_history (
+        order_nr, asset_id, product, qty,
+        customer, priority, due_date, status, change_type
+      )
+      SELECT order_nr, asset_id, product, qty,
+             customer, priority, due_date, status, change_type
+      FROM upserted;
+    args_mapping: |
+      [
+        this.order_nr,
+        this.asset_id,
+        this.product,
+        this.qty,
+        this.customer,
+        this.priority,
+        this.due_date,
+        this.status,
+        meta("action").uppercase()
+      ]
+    max_in_flight: 20

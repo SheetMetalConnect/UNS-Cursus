@@ -1,0 +1,83 @@
+# ==============================================================================
+# Sessie 5, Deel 1 — UNS → erp_sales_order tabel (eenvoudige upsert)
+# ==============================================================================
+# Luistert op _erp.sales_orders in Redpanda en schrijft naar de
+# erp_sales_order tabel in TimescaleDB. Simpele upsert — altijd overschrijven.
+#
+# Dit is bewust simpel: geen deduplicatie, geen history.
+# In Deel 2 (work orders) laten we zien hoe je dat wél doet.
+#
+# Deploy via: Management Console → Data Flows → Stand-alone → Add
+# Naam: sales-order-bridge
+# Deploy NADAT api-sales-order actief is
+# ==============================================================================
+
+input:
+  uns:
+    consumer_group: sales_order_bridge
+    umh_topic: "umh\\.v1\\..*\\._erp\\.sales_orders"
+
+pipeline:
+  processors:
+    - bloblang: |
+        let topic = meta("umh_topic")
+        root = if $topic.contains("_erp.sales_orders") { this } else { deleted() }
+
+    # Extract ISA-95 locatie uit topic
+    - bloblang: |
+        let topic = meta("umh_topic")
+        let parts = $topic.split("_erp").index(0).split(".").slice(2, -1)
+        meta enterprise = parts.index(0).catch("")
+        meta site = parts.index(1).catch("")
+        meta area = parts.index(2).catch("")
+        meta line = parts.index(3).catch("")
+        meta workcell = parts.index(4).catch("")
+        meta origin_id = parts.index(5).catch("")
+
+    # Asset ID lookup
+    - branch:
+        processors:
+          - sql_raw:
+              driver: postgres
+              dsn: ${DB_DSN}
+              unsafe_dynamic_query: true
+              query: |
+                SELECT get_asset_id(
+                  '${! meta("enterprise") }',
+                  '${! meta("site").or("") }',
+                  '${! meta("area").or("") }',
+                  '${! meta("line").or("") }',
+                  '${! meta("workcell").or("") }',
+                  '${! meta("origin_id").or("") }'
+                ) AS id;
+        result_map: root.asset_id = this.index(0).id
+
+output:
+  sql_raw:
+    driver: postgres
+    dsn: ${DB_DSN}
+    query: |
+      INSERT INTO erp_sales_order (
+        order_id, asset_id, customer_name, milestone,
+        due_date, order_date, delivered_date, status, change_type
+      )
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'UPSERT')
+      ON CONFLICT (order_id, asset_id) DO UPDATE SET
+        customer_name = EXCLUDED.customer_name,
+        milestone = EXCLUDED.milestone,
+        due_date = EXCLUDED.due_date,
+        order_date = EXCLUDED.order_date,
+        delivered_date = EXCLUDED.delivered_date,
+        status = EXCLUDED.status,
+        updated_at = NOW();
+    args_mapping: |
+      [
+        this.order_id,
+        this.asset_id,
+        this.customer_name,
+        this.milestone,
+        this.due_date,
+        this.order_date,
+        this.delivered_date,
+        this.status
+      ]

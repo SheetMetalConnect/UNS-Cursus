@@ -1,0 +1,6 @@
+order_id,customer_name,status,milestone,due_date,order_date
+SO-001,Metaaltechniek de Vries,Open,Open,2026-05-15,2026-04-20
+SO-002,Constructiebedrijf Jansen,Bevestigd,Bevestigd,2026-05-10,2026-04-18
+SO-003,Machinefabriek Bakker,Open,Open,2026-05-20,2026-04-22
+SO-004,Scheepswerf Rotterdam,Verzonden,Verzonden,2026-04-30,2026-04-10
+SO-005,Staalhandel Groot,Bevestigd,Bevestigd,2026-05-08,2026-04-15

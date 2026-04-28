@@ -1,0 +1,90 @@
+# ==============================================================================
+# Work Order Process (Deduplicatie)
+# ==============================================================================
+# Vergelijkt binnenkomende .process berichten met de database en bepaalt:
+#   - .create    → nieuw (nog niet in DB)
+#   - .update    → bestaand maar velden gewijzigd
+#   - .duplicate → bestaand en niks veranderd (skip)
+#
+# Dit is het verschil met Deel 1 (sales orders): daar overschreven we alles.
+# Nu weten we of data echt veranderd is, en houden we een history bij.
+#
+# Topic flow:
+#   umh.v1.smc.workshop._work_order.process
+#     → (DB lookup + vergelijking)
+#     → umh.v1.smc.workshop._work_order.create|update|duplicate
+#
+# Deploy via: Management Console → Data Flows → Stand-alone → Add
+# Naam: work-order-process
+# ==============================================================================
+
+input:
+  uns:
+    umh_topic: "umh\\.v1\\..*\\._work_order\\.process"
+    consumer_group: work_order_process
+
+pipeline:
+  processors:
+    # Alleen .process berichten doorlaten
+    - bloblang: |
+        let umh_topic = meta("umh_topic")
+        let action = $umh_topic.split(".").index(-1)
+        root = if $action == "process" { this } else { deleted() }
+
+    # Asset ID opzoeken via ISA-95 locatie uit het topic pad
+    - branch:
+        processors:
+          - bloblang: |
+              let umh_topic = meta("umh_topic")
+              let parts = $umh_topic.split("_work_order").index(0).split(".").slice(2, -1)
+              root.enterprise = parts.index(0).catch("")
+              root.site = parts.index(1).catch("")
+              root.area = parts.index(2).catch("")
+              root.line = parts.index(3).catch("")
+              root.workcell = parts.index(4).catch("")
+              root.origin_id = parts.index(5).catch("")
+
+          - sql_select:
+              driver: postgres
+              dsn: ${DB_DSN}
+              table: asset
+              where: id = get_asset_id(?, ?, ?, ?, ?, ?)
+              args_mapping: "[ this.enterprise, this.site, this.area, this.line, this.workcell, this.origin_id ]"
+              columns: [id]
+
+          - bloblang: root.asset_id = this.index(0).id
+
+          - catch:
+              - log:
+                  level: ERROR
+                  message: "Asset lookup mislukt: ${!meta(\"umh_topic\")}"
+        result_map: root.asset_id = this.asset_id
+
+    # Bestaand record opzoeken
+    - branch:
+        processors:
+          - sql_select:
+              driver: postgres
+              dsn: ${DB_DSN}
+              table: erp_work_order
+              columns: ["*"]
+              where: order_nr = $1 AND asset_id = $2
+              args_mapping: "[ this.order_nr, this.asset_id ]"
+        result_map: |
+          root.existing = if this.length() == 0 { null } else { this.index(0) }
+
+    # Vergelijken: create, update of duplicate?
+    - bloblang: |
+        let existing = this.existing
+        let change_type = if $existing == null {
+          "create"
+        } else if this.order_nr == $existing.order_nr && this.product == $existing.product && this.qty == $existing.qty && this.customer == $existing.customer && this.priority == $existing.priority && this.due_date == $existing.due_date && this.status == $existing.status {
+          "duplicate"
+        } else {
+          "update"
+        }
+        root.existing = deleted()
+        meta umh_topic = meta("umh_topic").trim_suffix("process") + $change_type
+
+output:
+  uns: {}

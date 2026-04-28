@@ -1,0 +1,47 @@
+# ==============================================================================
+# Sessie 5, Deel 1 — REST API → Sales Orders in UNS
+# ==============================================================================
+# Wat doet het:
+#   - HTTP POST endpoint op :8090/api/v1/
+#   - Ontvangt sales order data (vanuit Node-RED of elk ander systeem)
+#   - Routeert naar UNS topic umh.v1.smc.workshop._erp.sales_orders
+#   - De sales-order-bridge (aparte flow) schrijft naar erp_sales_order tabel
+#
+# Deploy via: Management Console → Data Flows → Stand-alone → Add
+# Naam: api-sales-order
+#
+# Test met curl:
+#   curl -X POST http://localhost:8090/api/v1/ \
+#     -H "Content-Type: application/json" \
+#     -d '{
+#       "order_id": "SO-001",
+#       "customer_name": "Metaaltechniek de Vries",
+#       "status": "Open",
+#       "milestone": "Open",
+#       "due_date": "2026-05-15",
+#       "order_date": "2026-04-20"
+#     }'
+# ==============================================================================
+
+input:
+  http_server:
+    address: 0.0.0.0:8090
+    allowed_verbs:
+      - POST
+    path: /api/v1/
+
+pipeline:
+  processors:
+    - bloblang: |
+        meta umh_topic = "umh.v1.smc.workshop._erp.sales_orders"
+        root.order_id = this.order_id.or("")
+        root.customer_name = this.customer_name.or("")
+        root.status = this.status.or("Open")
+        root.milestone = this.milestone.or(this.status).or("Open")
+        root.due_date = this.due_date.or(null)
+        root.order_date = this.order_date.or(null)
+        root.delivered_date = this.delivered_date.or(null)
+        root.timestamp_ms = now().ts_unix_milli()
+
+output:
+  uns: {}

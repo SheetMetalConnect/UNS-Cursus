@@ -1,0 +1,39 @@
+# ==============================================================================
+# MQTT → UNS Bridge (HiveMQ → Redpanda)
+# ==============================================================================
+# Pakt work order berichten op van de MQTT broker (HiveMQ)
+# en stuurt ze door naar de UNS (Redpanda) voor verwerking.
+#
+# Waarom: Node-RED publiceert naar MQTT. Deze bridge brengt het
+# in de UNS, waar de process- en persistence-flows het oppakken.
+#
+# Deploy via: Management Console → Data Flows → Stand-alone → Add
+# Naam: mqtt-to-uns-bridge
+# ==============================================================================
+
+input:
+  mqtt:
+    auto_replay_nacks: false
+    client_id: cursus_mqtt_to_uns
+    dynamic_client_id_suffix: nanoid
+    urls:
+      - tcp://hivemq:1883
+    topics:
+      # _work_order — alle ISA-95 dieptes
+      - umh/v1/+/_work_order/process
+      - umh/v1/+/+/_work_order/process
+      - umh/v1/+/+/+/_work_order/process
+      - umh/v1/+/+/+/+/_work_order/process
+      - umh/v1/+/+/+/+/+/_work_order/process
+      - umh/v1/+/+/+/+/+/+/_work_order/process
+
+pipeline:
+  processors:
+    - bloblang: |
+        let mqtt_topic = meta("mqtt_topic").or("")
+        root = if $mqtt_topic == "" { deleted() } else { this }
+        meta umh_topic = $mqtt_topic.replace("/", ".")
+        meta umh_key = $mqtt_topic.split("/").index(-1)
+
+output:
+  uns: {}
