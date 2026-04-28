@@ -1,16 +1,16 @@
 order_nr,product,asset,qty,customer,priority,due_date,status
-WO-2026-001,BRACKET-A1,laser-cutter-L1,120,Metaalwerk BV,1,2026-05-05,Nieuw
-WO-2026-002,FRAME-B2,buigmachine-B1,80,Constructiebedrijf Jansen,2,2026-05-08,Nieuw
-WO-2026-003,PLATE-C3,laser-cutter-L1,250,Tata Steel Nederland,1,2026-05-02,Bezig
-WO-2026-004,HOUSING-D4,freesmachine-M1,45,Machinefabriek Bakker,2,2026-05-12,Nieuw
-WO-2026-005,FLANGE-E5,lasmachine-W1,180,Scheepswerf Rotterdam,1,2026-05-03,Bezig
-WO-2026-006,TUBE-F6,zaagmachine-Z1,300,Staalhandel Groot,3,2026-05-15,Nieuw
-WO-2026-007,PANEL-G7,laser-cutter-L1,60,VDL Groep,1,2026-05-01,Klaar
-WO-2026-008,BRACKET-A1,buigmachine-B1,150,Aalberts Industries,2,2026-05-18,Nieuw
-WO-2026-009,COVER-H8,freesmachine-M1,90,Metaalwerk BV,1,2026-05-06,Bezig
-WO-2026-010,FRAME-B2,lasmachine-W1,200,Koninklijke Lankhorst,3,2026-05-22,Nieuw
-WO-2026-011,PLATE-C3,laser-cutter-L1,500,Tata Steel Nederland,1,2026-05-10,Klaar
-WO-2026-012,FLANGE-E5,zaagmachine-Z1,35,Scheepswerf Rotterdam,2,2026-06-01,Nieuw
-WO-2026-013,HOUSING-D4,freesmachine-M1,70,Constructiebedrijf Jansen,1,2026-06-05,Bezig
-WO-2026-014,TUBE-F6,buigmachine-B1,400,Staalhandel Groot,2,2026-06-10,Nieuw
-WO-2026-015,PANEL-G7,lasmachine-W1,25,VDL Groep,3,2026-06-15,Klaar
+WO-2026-001,BRACKET-A1,laser-cutter-L1,100,Metaalwerk BV,1,2026-05-15,Nieuw
+WO-2026-002,FRAME-B2,buigmachine-B1,50,Constructiebedrijf Jansen,2,2026-05-20,Nieuw
+WO-2026-003,PLATE-C3,laser-cutter-L1,200,Tata Steel Nederland,1,2026-05-10,Bezig
+WO-2026-004,HOUSING-D4,freesmachine-M1,30,Machinefabriek Bakker,2,2026-05-25,Nieuw
+WO-2026-005,FLANGE-E5,lasmachine-W1,75,Scheepswerf Rotterdam,1,2026-05-12,Bezig
+WO-2026-006,TUBE-F6,zaagmachine-Z1,150,Staalhandel Groot,3,2026-06-01,Nieuw
+WO-2026-007,PANEL-G7,laser-cutter-L1,80,VDL Groep,2,2026-05-08,Klaar
+WO-2026-008,BRACKET-A1,buigmachine-B1,120,Aalberts Industries,1,2026-05-18,Nieuw
+WO-2026-009,FRAME-B2,lasmachine-W1,40,Metaalwerk BV,2,2026-05-22,Bezig
+WO-2026-010,HOUSING-D4,freesmachine-M1,25,Koninklijke Lankhorst,3,2026-06-05,Nieuw
+WO-2026-011,PLATE-C3,laser-cutter-L1,300,Tata Steel Nederland,1,2026-05-05,Klaar
+WO-2026-012,FLANGE-E5,zaagmachine-Z1,60,Scheepswerf Rotterdam,2,2026-05-28,Nieuw
+WO-2026-013,TUBE-F6,buigmachine-B1,60,Constructiebedrijf Jansen,1,2026-05-16,Bezig
+WO-2026-014,PANEL-G7,laser-cutter-L1,45,Staalhandel Groot,3,2026-06-10,Nieuw
+WO-2026-015,BRACKET-A1,lasmachine-W1,20,VDL Groep,1,2026-05-03,Klaar
