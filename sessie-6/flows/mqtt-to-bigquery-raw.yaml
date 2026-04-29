@@ -1,0 +1,42 @@
+# ==============================================================================
+# MQTT → BigQuery Raw Bridge (Standalone Benthos/Redpanda Connect)
+# ==============================================================================
+# Streamt alle MQTT-berichten van HiveMQ naar BigQuery als raw JSON.
+# Draait als standalone container naast de MetalFab stack.
+#
+# Tabel: uns_cursus.uns_raw_test (pre-created)
+# Format: NEWLINE_DELIMITED_JSON
+#
+# BigQuery load API limiet: max 1500 load jobs/tabel/dag
+# Daarom: grote batches (500 msg of 60s), max_in_flight: 1
+# ==============================================================================
+
+input:
+  mqtt:
+    urls:
+      - tcp://metalfab-hivemq:1883
+    topics:
+      - "umh/v1/metalfab/#"
+    client_id: benthos-bigquery-bridge
+    clean_session: true
+    qos: 1
+
+pipeline:
+  processors:
+    - bloblang: |
+        root.timestamp = now()
+        root.topic = meta("mqtt_topic")
+        root.payload = this.string()
+
+output:
+  gcp_bigquery:
+    project: ve-systems-486013
+    dataset: uns_cursus
+    table: uns_raw_test
+    format: NEWLINE_DELIMITED_JSON
+    max_in_flight: 1
+    write_disposition: WRITE_APPEND
+    create_disposition: CREATE_NEVER
+    batching:
+      count: 500
+      period: "60s"

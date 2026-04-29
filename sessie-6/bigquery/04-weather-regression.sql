@@ -5,11 +5,11 @@
 -- Linear regression: voorspel power output op basis van weer
 -- ==============================================================================
 
--- Stap 1: Combineer weer + solar data (join op tijd)
+-- Stap 1: Combineer weer + solar data (join op tijd, 5-min buckets)
 CREATE OR REPLACE VIEW uns_cursus.weather_solar_combined AS
 SELECT
-  s.time,
-  s.dc_power_w AS power_w,
+  w.time,
+  AVG(s.daily_yield_kwh) AS yield_kwh,
   w.solar_irradiance,
   w.temperature_c,
   w.humidity_pct,
@@ -17,19 +17,21 @@ SELECT
   w.wind_speed_kmh
 FROM uns_cursus.solar_power s
 JOIN uns_cursus.weather w
-  ON TIMESTAMP_TRUNC(s.time, MINUTE) = TIMESTAMP_TRUNC(w.time, MINUTE)
-WHERE s.dc_power_w IS NOT NULL
-  AND w.solar_irradiance IS NOT NULL;
+  ON TIMESTAMP_SECONDS(DIV(UNIX_SECONDS(s.time), 300) * 300)
+     = TIMESTAMP_SECONDS(DIV(UNIX_SECONDS(w.time), 300) * 300)
+WHERE s.daily_yield_kwh IS NOT NULL
+  AND w.solar_irradiance IS NOT NULL
+GROUP BY w.time, w.solar_irradiance, w.temperature_c, w.humidity_pct, w.cloud_cover_pct, w.wind_speed_kmh;
 
 -- Stap 2: Regressiemodel trainen
--- Welke weerfactoren voorspellen de power output het beste?
+-- Welke weerfactoren voorspellen de solar yield het beste?
 CREATE OR REPLACE MODEL uns_cursus.weather_power_model
 OPTIONS(
   model_type = 'LINEAR_REG',
-  input_label_cols = ['power_w']
+  input_label_cols = ['yield_kwh']
 ) AS
 SELECT
-  power_w,
+  yield_kwh,
   solar_irradiance,
   temperature_c,
   humidity_pct,

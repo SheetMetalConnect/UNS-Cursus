@@ -7,9 +7,9 @@
 | Bestand | Wat het doet |
 |---------|-------------|
 | `bigquery/01-create-tables.sql` | BigQuery tabellen aanmaken |
-| `bigquery/02-solar-forecast.sql` | Solar vermogen voorspellen (ARIMA_PLUS) |
+| `bigquery/02-solar-forecast.sql` | Solar yield voorspellen (ARIMA_PLUS) |
 | `bigquery/03-anomaly-detection.sql` | Anomaly detection op machine data |
-| `bigquery/04-weather-regression.sql` | Weer → solar output regressie |
+| `bigquery/04-weather-regression.sql` | Weer → solar yield regressie |
 
 ### Data exports (CSV → BigQuery upload)
 
@@ -31,9 +31,24 @@
 
 | # | Use case | Model | Data |
 |---|----------|-------|------|
-| 1 | Hoeveel stroom leveren mijn panelen morgen? | ARIMA_PLUS forecast | Solar power |
+| 1 | Hoeveel stroom leveren mijn panelen morgen? | ARIMA_PLUS forecast | Solar yield (kWh) |
 | 2 | Draait mijn machine normaal? | Anomaly detection | Machine runtimes |
 | 3 | Welk weer bepaalt mijn opbrengst? | Linear regression | Weer + solar |
+
+## UNS → BigQuery Bridge
+
+Live streaming van UNS data naar BigQuery via Benthos/Redpanda Connect.
+
+| Bestand | Wat het doet |
+|---------|-------------|
+| `flows/uns-to-bigquery.yaml` | Stand-alone dataflow: UNS → BigQuery |
+
+### Setup
+
+1. Service account key op de UMH server plaatsen
+2. `GOOGLE_APPLICATION_CREDENTIALS=/path/to/key.json` instellen
+3. Flow deployen via Management Console → Data Flows → Stand-alone
+4. Batcht 500 berichten of elke 30 seconden — kost < $1/maand
 
 ## MCP Servers (Claude Desktop integratie)
 

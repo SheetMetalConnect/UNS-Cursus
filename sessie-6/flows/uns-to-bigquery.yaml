@@ -1,0 +1,65 @@
+# ==============================================================================
+# UNS → BigQuery Bridge (Stand-alone Dataflow)
+# ==============================================================================
+# Streamt sensordata van de UNS (Redpanda/Kafka) naar BigQuery.
+# Deploy via UMH Management Console → Data Flows → Stand-alone
+#
+# Vereist:
+#   - GCP service account key als GOOGLE_APPLICATION_CREDENTIALS
+#   - BigQuery dataset 'uns_cursus' in project 've-systems-486013'
+#   - Tabellen: solar_power, weather, machine_production
+# ==============================================================================
+
+input:
+  kafka:
+    addresses:
+      - united-manufacturing-hub-kafka:9092
+    topics:
+      - umh.v1.metalfab.tilburg.solar._historian
+      - umh.v1.metalfab.tilburg.weather._historian
+      - umh.v1.metalfab.tilburg.machining._historian
+    consumer_group: uns-to-bigquery
+
+pipeline:
+  processors:
+    # Bepaal doeltabel op basis van het Kafka topic
+    - bloblang: |
+        let topic = meta("kafka_topic")
+
+        root.time = this.timestamp_ms.format_timestamp("2006-01-02 15:04:05")
+
+        if $topic.contains("solar") {
+          meta bq_table = "solar_power"
+          root.dc_power_w = this.dc_power_w | null
+          root.ac_power_w = this.ac_power_w | null
+          root.panel_temp_c = this.panel_temp_c | null
+          root.grid_freq_hz = this.grid_freq_hz | null
+          root.daily_yield_kwh = this.daily_yield_kwh | null
+        } else if $topic.contains("weather") {
+          meta bq_table = "weather"
+          root.solar_irradiance = this.solar_irradiance | null
+          root.temperature_c = this.temperature_c | null
+          root.humidity_pct = this.humidity_pct | null
+          root.cloud_cover_pct = this.cloud_cover_pct | null
+          root.wind_speed_kmh = this.wind_speed_kmh | null
+          root.pressure_hpa = this.pressure_hpa | null
+        } else if $topic.contains("machining") {
+          meta bq_table = "machine_production"
+          root.run_time_sec = this.run_time_sec | null
+          root.down_time_sec = this.down_time_sec | null
+          root.planned_cycle_ms = this.planned_cycle_ms | null
+          root.downstream_blocked = this.downstream_blocked | null
+        }
+
+output:
+  gcp_bigquery:
+    project: ve-systems-486013
+    dataset: uns_cursus
+    table: ${! meta("bq_table") }
+    format: NEWLINE_DELIMITED_JSON
+    max_in_flight: 4
+    write_disposition: WRITE_APPEND
+    create_disposition: CREATE_NEVER
+    batching:
+      count: 500
+      period: "30s"
