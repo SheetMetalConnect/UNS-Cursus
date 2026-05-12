@@ -30,7 +30,7 @@ Na 6 sessies heb je:
 | [Sessie 3](sessie-3/) | Industriele Protocollen | OPC UA, Modbus en MQTT bridges configureren — machines aansluiten op de UNS |
 | [Sessie 4](sessie-4/) | Grafana Dashboards | Dashboards bouwen met echte machinedata, ERP-data ophalen via polling |
 | [Sessie 5](sessie-5/) | ERP- & MES-integratie | Data bridges, deduplicatie, audit trail — non-event-driven systemen event-driven maken |
-| [Sessie 6](sessie-6/) | AI-integratie & Data naar de Cloud | Binnenkort |
+| [Sessie 6](sessie-6/) | AI-integratie & Data naar de Cloud | MCP servers (Claude Desktop praat met je UNS), data naar BigQuery, ML met SQL: forecasting, anomaly detection, regressie |
 
 ## Wat heb je nodig?
 
