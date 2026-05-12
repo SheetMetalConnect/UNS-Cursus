@@ -30,7 +30,7 @@ Na 6 sessies heb je:
 | [Sessie 3](sessie-3/) | Industriele Protocollen | OPC UA, Modbus en MQTT bridges configureren — machines aansluiten op de UNS |
 | [Sessie 4](sessie-4/) | Grafana Dashboards | Dashboards bouwen met echte machinedata, ERP-data ophalen via polling |
 | [Sessie 5](sessie-5/) | ERP- & MES-integratie | Data bridges, deduplicatie, audit trail — non-event-driven systemen event-driven maken |
-| [Sessie 6](sessie-6/) | AI Agent op de UNS | AI-agent abonneert op MQTT en Kafka via MCP — chatten met je fabriek vanuit Claude Desktop. BigQuery cloud-demo als afsluiter. |
+| [Sessie 6](sessie-6/) | AI Agent op de UNS | Agent als backend-service (niet als chat-app): subscribe op de UNS, heartbeat publiceren, historian queryen, scoped publishen. Chat-frontend via Claude Desktop, gekoppeld via MCP. BigQuery cloud-demo als afsluiter. |
 
 ## Wat heb je nodig?
 

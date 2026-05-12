@@ -35,6 +35,49 @@ De agent vervangt geen dashboard. Hij vervangt **het tikken** dat tussen jou en 
 
 ---
 
+## De agent is geen chatvenster — het is een backend
+
+Voordat we MCP induiken: een misvatting rechtzetten. Veel mensen denken "de agent zit in Claude Desktop". Klopt niet. **Claude Desktop is alleen de telefoon waarmee je belt.** De agent zelf — de collega die het werk doet — is een backend-service die persistent draait, abonneert op de UNS, een hartslag publiceert, en queries uitvoert.
+
+```
+   [Cursist/Luke]
+        |
+        v (chat)
+   [Chat UI: Claude Desktop]   <-- alleen UI-laag, "de telefoon"
+        |
+        v (MCP-protocol)
+   [Backend: Python MCP-servers]  <-- DIT IS DE AGENT, "de medewerker"
+        |
+        +--> MQTT subscribe + publish (HiveMQ)
+        +--> TimescaleDB query (historian)
+        +--> Status-heartbeat naar UNS
+```
+
+> **Werkplaats-analogie:** de chat-UI is de telefoon op je bureau. De backend MCP-server is de medewerker in de werkplaats die het gereedschap pakt, meet, rapporteert en bijhoudt of hij nog leeft. Als de telefoon uitstaat, doet de medewerker gewoon zijn werk verder.
+
+### Vier eisen aan een UNS-agent
+
+Wij definieren een agent op de UNS niet als "een chat-app", maar als een backend-service die deze vier dingen kan:
+
+1. **Subscribe op de UNS** — abonneert op MQTT/Kafka-topics (lezen wat er gebeurt)
+2. **Status publiceren** — publiceert elke 10s een heartbeat op `umh/v1/smc/agents/<naam>/_status` met state (`online` / `idle` / `processing` / `offline`). Daardoor zie je in de UNS zelf welke agents leven.
+3. **Met API's praten** — query de TimescaleDB-historian, analyseer en visualiseer data
+4. **Publiceren** — schrijf writes/commands naar de UNS, scoped naar de eigen agent-namespace voor veiligheid
+
+Een chat-UI zonder heartbeat, zonder persistent subscribe, zonder publish-rechten is **geen agent** — dat is een gespreksvenster met tools. Het echte werk gebeurt in de backend.
+
+### Chat-frontend vs agent-backend vs FOSS-alternatief
+
+| Laag | Voorbeeld | Heartbeat? | Persistent? |
+|------|-----------|-----------|-------------|
+| Chat-frontend | Claude Desktop, Cursor | Nee | Nee — start/stop met app |
+| Agent-backend | `uns-mqtt`, `uns-timescaledb` (Python MCP) | Ja | Ja — long-running service |
+| FOSS-frontend (later) | LibreChat self-hosted | n.v.t. (zelfde backend) | n.v.t. |
+
+LibreChat is een open-source alternatief voor de chat-UI dat je zelf kunt hosten — komt later beschikbaar als optie. De backend (onze MCP-servers) blijft hetzelfde.
+
+---
+
 ## Hoe werkt het — Model Context Protocol
 
 **Model Context Protocol (MCP)** is een open standaard van Anthropic. Het lost één probleem op: hoe geef je een AI-model toegang tot jouw systemen zonder data te copy-pasten?
@@ -44,26 +87,32 @@ Verschil met een gewone API:
 - **API** = jij stuurt losse calls, de AI weet niets van je systeem
 - **MCP** = de AI ziet welke tools beschikbaar zijn, kiest zelf de juiste, en chained ze aan elkaar
 
-### Twee MCP-servers voor de UNS
+### Twee MCP-servers (de agent-backends) voor de UNS
 
 | Server | Wat het doet | Op welke topic/tabel |
 |--------|-------------|----------------------|
-| `uns-mqtt` | Subscribe, publish, list topics | HiveMQ broker (`umh.v1.#`) |
-| `uns-timescaledb` | Sensoren, werkorders, sales orders, custom SQL | TimescaleDB historian |
+| `uns-mqtt` | Subscribe, publish, list topics, heartbeat | HiveMQ broker (`umh.v1.#` + `umh/v1/smc/agents/<naam>/_status`) |
+| `uns-timescaledb` | Sensoren, werkorders, sales orders, custom SQL, heartbeat | TimescaleDB historian |
 
-### Architectuur
+Beide servers publiceren elke 10s hun eigen status naar de UNS. Daardoor kun je in MQTT Explorer of via een query letterlijk zien welke agents leven — net als elke andere asset op je vloer.
+
+### Architectuur (uitgewerkt)
 
 ```
-Claude Desktop (of Cursor, of een andere MCP client)
+Chat-frontend (Claude Desktop / Cursor / LibreChat)
     |
-    |-- MCP (stdio) --> uns-mqtt ---------> HiveMQ (:1883) ---> Redpanda (Kafka)
+    |-- MCP (stdio) --> [BACKEND: uns-mqtt] -----------> HiveMQ (:1883) ---> Redpanda (Kafka)
+    |                          |                              ^
+    |                          +-- heartbeat 10s -------------+ (umh/v1/smc/agents/uns-mqtt/_status)
     |
-    |-- MCP (stdio) --> uns-timescaledb --> TimescaleDB (:5432)
+    |-- MCP (stdio) --> [BACKEND: uns-timescaledb] ---> TimescaleDB (:5432)
+                               |
+                               +-- heartbeat 10s ------> HiveMQ (umh/v1/smc/agents/uns-timescaledb/_status)
 ```
 
-De agent draait op je laptop. De MCP-servers draaien als child process. De UNS draait in Docker. Niets gaat naar de cloud — behalve de chat-prompts naar Anthropic, waar de agent zelf zit.
+De chat-frontend draait op je laptop. De MCP-servers (de echte agents) draaien als child process en blijven leven zolang de chat-app actief is. De UNS draait in Docker. Niets gaat naar de cloud — behalve de chat-prompts naar Anthropic, waar het LLM zelf zit.
 
-> **Werkplaats-analogie:** MCP is de "iedereen verstaat dezelfde taal" afspraak. De agent praat MCP, de servers praten MCP, dus ze begrijpen elkaar zonder dat jij voor elke koppeling iets moet bouwen.
+> **Werkplaats-analogie:** MCP is de "iedereen verstaat dezelfde taal" afspraak. De chat praat MCP, de agent-backend praat MCP, dus ze begrijpen elkaar zonder dat jij voor elke koppeling iets moet bouwen.
 
 ---
 
@@ -73,16 +122,20 @@ We laten dit live zien op Luke's stack. Volg mee in Discord.
 
 ### Demo-vragen die we draaien
 
-1. *"Welke MQTT topics zijn nu actief op mijn broker?"* → `mqtt_list_topics`
-2. *"Wat zijn de laatste 5 berichten op `umh.v1.smc.vienna.solar._historian`?"* → `mqtt_subscribe`
-3. *"Welke assets heb ik in mijn fabriek?"* → `list_assets`
-4. *"Wat was de gemiddelde solar yield vandaag?"* → `query_sensors`
-5. *"Vergelijk solar output van vandaag met gisteren — wat valt op?"* → meerdere tools chained
-6. *"Hoeveel werkorders staan open en welke hebben prioriteit 1?"* → `query_work_orders`
-7. *"Wat is er gebeurd met werkorder WO-001?"* → `query_work_order_history`
-8. *"Geef een totaalrapport van de fabriek nu."* → chained — agent kiest zelf welke tools
-9. *"Publiceer een test werkorder voor 25 stuks beugels op de CNC."* → `mqtt_publish`
-10. **Vrije vraag uit de zaal** — laat een deelnemer iets vragen wat hij in zijn eigen fabriek zou willen weten
+Eerste twee vragen prikken direct de vier requirements aan: status (heartbeat), publiceren (eigen namespace), subscribe (UNS lezen), API (historian).
+
+1. *"Wat is de status van mijn agent? Leeft hij nog?"* → agent queryt zijn eigen heartbeat-topic `umh/v1/smc/agents/uns-mqtt/_status` (**requirement 2: status publiceren is zichtbaar in UNS**)
+2. *"Publiceer een testbericht op je eigen agent-namespace."* → `mqtt_publish` naar `umh/v1/smc/agents/<naam>/_test` (**requirement 4: publish, scoped**)
+3. *"Welke MQTT topics zijn nu actief op mijn broker?"* → `mqtt_list_topics` (**requirement 1: subscribe/zien**)
+4. *"Wat zijn de laatste 5 berichten op `umh.v1.smc.vienna.solar._historian`?"* → `mqtt_subscribe`
+5. *"Welke assets heb ik in mijn fabriek?"* → `list_assets` (**requirement 3: API/historian**)
+6. *"Wat was de gemiddelde solar yield vandaag?"* → `query_sensors`
+7. *"Vergelijk solar output van vandaag met gisteren — wat valt op?"* → meerdere tools chained
+8. *"Hoeveel werkorders staan open en welke hebben prioriteit 1?"* → `query_work_orders`
+9. *"Wat is er gebeurd met werkorder WO-001?"* → `query_work_order_history`
+10. *"Geef een totaalrapport van de fabriek nu."* → chained — agent kiest zelf welke tools
+11. *"Publiceer een test werkorder voor 25 stuks beugels op de CNC."* → `mqtt_publish`
+12. **Vrije vraag uit de zaal** — laat een deelnemer iets vragen wat hij in zijn eigen fabriek zou willen weten
 
 Bij elke vraag zie je in Claude Desktop welke tools de agent aanroept en welke output hij terugkrijgt — geen black box.
 
@@ -118,18 +171,27 @@ cd ../uns-mqtt && uv sync
     "uns-timescaledb": {
       "command": "uv",
       "args": ["--directory", "<JOUW-PAD>/UNS-Cursus/mcp-servers/uns-timescaledb", "run", "src/server.py"],
-      "env": { "UNS_DB_DSN": "postgresql://grafanareader:changeme@localhost:5432/umh" }
+      "env": {
+        "UNS_DB_DSN": "postgresql://grafanareader:changeme@localhost:5432/umh",
+        "AGENT_NAME": "uns-timescaledb-<jouwnaam>"
+      }
     },
     "uns-mqtt": {
       "command": "uv",
       "args": ["--directory", "<JOUW-PAD>/UNS-Cursus/mcp-servers/uns-mqtt", "run", "src/server.py"],
-      "env": { "UNS_MQTT_HOST": "localhost", "UNS_MQTT_PORT": "1883" }
+      "env": {
+        "UNS_MQTT_HOST": "localhost",
+        "UNS_MQTT_PORT": "1883",
+        "AGENT_NAME": "uns-mqtt-<jouwnaam>"
+      }
     }
   }
 }
 ```
 
-Herstart Claude Desktop. Je ziet linksonder een hamertje-icoon — daarin staan de tools van beide servers.
+`AGENT_NAME` is verplicht — de backend gebruikt die om zijn heartbeat te publiceren op `umh/v1/smc/agents/<naam>/_status` en om publish-rechten te scopen naar `umh/v1/smc/agents/<naam>/...`. Vul je voornaam in zodat we in de demo zien wie er online is.
+
+Herstart Claude Desktop. Je ziet linksonder een hamertje-icoon — daarin staan de tools van beide servers. In MQTT Explorer zou je nu binnen 10 seconden je eigen agent moeten zien verschijnen onder `umh/v1/smc/agents/`.
 
 ### Stap 4 — Stel je eerste vraag
 

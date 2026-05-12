@@ -16,10 +16,11 @@
 | 4 | Werkorders/sales orders in DB | Uit sessie 5 — `query_work_orders` en `query_sales_orders` geven rijen terug |
 | 5 | Claude Desktop open | Hamertje-icoon zichtbaar, beide MCP-servers staan in de lijst |
 | 6 | MCP-server pad in config absoluut | `claude_desktop_config.json` checken — geen `~`, geen relatieve paden |
-| 7 | Backup-vragen klaar | Print uit, naast laptop — voor als demo hapert (zie onder) |
-| 8 | BigQuery Console open | Project `ve-systems-486013`, dataset `uns_cursus`, query klaargezet |
-| 9 | Discord open | `#cursusgroep` voor live Q&A en setup-hulp |
-| 10 | Tabs open | GitHub repo `sessie-6/`, Grafana solar dashboard, MQTT Explorer |
+| 7 | **Heartbeat zichtbaar op broker** | Vóór 14:00: `mosquitto_sub -h localhost -t 'umh/v1/smc/agents/+/_status' -v` — moet elke 10s een bericht tonen van beide MCP-servers (`uns-mqtt-luke`, `uns-timescaledb-luke`). Geen heartbeat = backend ligt eruit, demo-vraag 1 faalt. |
+| 8 | Backup-vragen klaar | Print uit, naast laptop — voor als demo hapert (zie onder) |
+| 9 | BigQuery Console open | Project `ve-systems-486013`, dataset `uns_cursus`, query klaargezet |
+| 10 | Discord open | `#cursusgroep` voor live Q&A en setup-hulp |
+| 11 | Tabs open | GitHub repo `sessie-6/`, Grafana solar dashboard, MQTT Explorer (gefocust op `umh/v1/smc/agents/#` om heartbeat live te tonen) |
 
 ---
 
@@ -45,15 +46,18 @@
 
 **Scherm:** handboek hoofdstuk "Het idee — chat met je fabriek"
 
-### 14:20–14:35 — MCP uitleg (15 min)
-**Wat zegt Luke:**
-- MCP = open standaard van Anthropic
-- API = losse calls; MCP = AI ziet je hele toolset en chained zelf
-- Twee servers voor de UNS: `uns-mqtt` (subscribe/publish/list) en `uns-timescaledb` (historian queries)
-- Architectuur tonen: alles lokaal, alleen chat-prompts gaan naar Anthropic
+### 14:20–14:35 — MCP uitleg + agent-as-backend (15 min)
+**Wat zegt Luke (eerst de misvatting rechtzetten):**
+- "De agent zit niet in Claude Desktop — Claude Desktop is alleen de telefoon. De agent is een **backend-service**."
+- Architectuurplaatje uit handboek: chat-frontend → MCP-protocol → Python backend → MQTT/DB
+- **Vier requirements aan een UNS-agent**: subscribe op UNS, status publiceren (heartbeat), API praten (historian), publiceren (scoped naar eigen namespace)
+- Werkplaats-analogie: chat = telefoon, backend = medewerker in de werkplaats die ook bij dichte telefoon zijn werk doet
+- Korte tabel: chat-frontend (Claude Desktop, geen heartbeat) vs agent-backend (MCP server, heartbeat) vs FOSS later (LibreChat)
+- MCP = open standaard van Anthropic. API = losse calls; MCP = AI ziet je hele toolset en chained zelf
+- Twee backend-servers voor de UNS: `uns-mqtt` (subscribe/publish/list/heartbeat) en `uns-timescaledb` (historian queries/heartbeat)
 - "Geen MCP, geen plek in mijn stack"
 
-**Scherm:** architectuur-diagram, dan `mcp-servers/README.md`, dan de tool-tabellen per server
+**Scherm:** handboek "De agent is geen chatvenster — het is een backend" → architectuur-diagram → MQTT Explorer met live heartbeats op `umh/v1/smc/agents/#` (laat zien dat de agents écht in de UNS staan) → tool-tabellen per server
 
 ---
 
@@ -63,18 +67,22 @@
 
 ### Demo-runbook (Luke draait deze in volgorde)
 
-| # | Vraag | Verwachte tool | Verwachte vorm |
-|---|-------|---------------|----------------|
-| 1 | "Welke MQTT topics zijn nu actief?" | `mqtt_list_topics` | Lijst topics, oa. `umh.v1.smc.vienna.solar...` |
-| 2 | "Wat zijn de laatste 5 berichten op `umh.v1.smc.vienna.solar._historian`?" | `mqtt_subscribe` | JSON payloads met timestamp + value |
-| 3 | "Welke assets heb ik in mijn fabriek?" | `list_assets` | ISA-95 hierarchie tabel |
-| 4 | "Wat was de gemiddelde solar yield vandaag?" | `query_sensors` met aggregate | Numeriek getal in kWh |
-| 5 | "Vergelijk solar output van vandaag met gisteren — wat valt op?" | meerdere tools chained | Korte analyse + cijfers |
-| 6 | "Hoeveel werkorders staan open en welke hebben prio 1?" | `query_work_orders` | Tabel met WO-nummers |
-| 7 | "Wat is er gebeurd met werkorder WO-001?" | `query_work_order_history` | Audit trail rijen |
-| 8 | "Geef een totaalrapport van de fabriek nu." | chained — agent kiest zelf | Samenvatting in mensentaal |
-| 9 | "Publiceer een test werkorder voor 25 stuks beugels op de CNC." | `mqtt_publish` | Confirmatie + topic + payload |
-| 10 | **Vrije vraag uit de zaal** | n.v.t. | n.v.t. — toon dat de agent improviseert |
+> **Opener (vraag 1+2)** raakt direct de vier requirements: heartbeat (status zichtbaar in UNS) en scoped publish. Dit is dé manier om "agent als backend" tastbaar te maken — niet door uitleg, maar door de heartbeat live in MQTT Explorer te tonen naast Claude Desktop.
+
+| # | Vraag | Verwachte tool | Verwachte vorm | Req |
+|---|-------|---------------|----------------|-----|
+| 1 | "Wat is de status van mijn agent? Leeft hij nog?" | `mqtt_subscribe` op `umh/v1/smc/agents/uns-mqtt-luke/_status` | JSON met `state: online`, `last_seen`, uptime | 2 (status) |
+| 2 | "Publiceer een testbericht op je eigen agent-namespace." | `mqtt_publish` naar `umh/v1/smc/agents/uns-mqtt-luke/_test` | Confirmatie + topic; toon bericht aankomen in MQTT Explorer | 4 (publish, scoped) |
+| 3 | "Welke MQTT topics zijn nu actief?" | `mqtt_list_topics` | Lijst topics, oa. `umh.v1.smc.vienna.solar...` | 1 (subscribe) |
+| 4 | "Wat zijn de laatste 5 berichten op `umh.v1.smc.vienna.solar._historian`?" | `mqtt_subscribe` | JSON payloads met timestamp + value | 1 |
+| 5 | "Welke assets heb ik in mijn fabriek?" | `list_assets` | ISA-95 hierarchie tabel | 3 (API) |
+| 6 | "Wat was de gemiddelde solar yield vandaag?" | `query_sensors` met aggregate | Numeriek getal in kWh | 3 |
+| 7 | "Vergelijk solar output van vandaag met gisteren — wat valt op?" | meerdere tools chained | Korte analyse + cijfers | 1+3 |
+| 8 | "Hoeveel werkorders staan open en welke hebben prio 1?" | `query_work_orders` | Tabel met WO-nummers | 3 |
+| 9 | "Wat is er gebeurd met werkorder WO-001?" | `query_work_order_history` | Audit trail rijen | 3 |
+| 10 | "Geef een totaalrapport van de fabriek nu." | chained — agent kiest zelf | Samenvatting in mensentaal | alle |
+| 11 | "Publiceer een test werkorder voor 25 stuks beugels op de CNC." | `mqtt_publish` | Confirmatie + topic + payload | 4 |
+| 12 | **Vrije vraag uit de zaal** | n.v.t. | n.v.t. — toon dat de agent improviseert | n.v.t. |
 
 **Tijdens demo benadrukken:**
 - Hamertje-icoon: laat zien welke tools zichtbaar zijn voor de agent
@@ -163,6 +171,7 @@ Veelvoorkomende valkuilen (uit handboek):
 
 | Risico | Mitigatie |
 |--------|-----------|
+| **Heartbeat-vraag (demo 1) hapert** | Backend ligt eruit of `AGENT_NAME` env var niet gezet. Fallback: skip naar demo 3 (`mqtt_list_topics`) en laat heartbeat zien direct in MQTT Explorer (toont nog steeds dat de backend leeft). Vermeld expliciet "de backend draait nog, alleen de tool-call faalt" — onderbouwt juist dat backend ≠ chat. |
 | **Claude Desktop hamertje verdwijnt** | Quit volledig (cmd+Q), open opnieuw. Config-pad checken op absoluut pad. Backup: MCP Inspector via `uv run mcp dev src/server.py` op http://localhost:6274 |
 | **HiveMQ heeft geen verkeer** | Start CSV-replay flow uit sessie 3 of MetalFab simulator. Demo-vragen 1, 2, 5 falen anders. |
 | **TimescaleDB connection refused** | `docker compose up -d` in `stack/`. Wacht tot health = healthy. Check DSN in MCP env: `postgresql://grafanareader:changeme@localhost:5432/umh` |
@@ -170,7 +179,7 @@ Veelvoorkomende valkuilen (uit handboek):
 | **Deelnemer heeft geen Claude Desktop subscription** | MCP Inspector werkt zonder LLM — kan tools nog steeds testen. Of meekijken in Discord. |
 | **MQTT broker host fout binnen Docker** | Vanaf laptop = `localhost`. Vanaf binnen container = `metalfab-hivemq`. Voor MCP server (lokaal): `localhost`. |
 | **BigQuery demo faalt** | Kort overslaan, niet stoppen — is bijzaak. Verwijs naar scripts in repo. |
-| **Tijd loopt uit op hands-on** | Schrap demo 8 (totaalrapport) en demo 10 (vrije vraag uit zaal) in de hoofd-demo om 5 min te winnen. |
+| **Tijd loopt uit op hands-on** | Schrap demo 10 (totaalrapport) en demo 12 (vrije vraag uit zaal) in de hoofd-demo om 5 min te winnen. Demo 1+2 (heartbeat/publish) NOOIT skippen — die dragen de hoofdboodschap. |
 | **Tijd loopt uit op afsluiting** | Skip BigQuery demo helemaal — die is bijzaak en staat in repo. |
 
 ---

@@ -1,16 +1,43 @@
 # Sessie 6 — AI Agent op de UNS
 
-> **Hoofdles:** AI-agent abonneert op de UNS (MQTT + Kafka via TimescaleDB historian) en chat met de fabriek via MCP.
+> **Hoofdles:** AI-agent (backend-service) abonneert op de UNS, publiceert een heartbeat, query't de historian — bediend via een chat-frontend zoals Claude Desktop. MCP koppelt de twee.
 > **Bijzaak:** BigQuery-upload als korte cloud-demo aan het eind van de sessie.
 
-## Hoofdles — MCP Servers (Claude Desktop praat met je UNS)
+## De agent is geen chatvenster — het is een backend
 
-Twee MCP-servers laten een AI-agent rechtstreeks met je UNS chatten:
+```
+   [Cursist/Luke]
+        |
+        v (chat)
+   [Chat UI: Claude Desktop]   <-- alleen UI-laag, "de telefoon"
+        |
+        v (MCP-protocol)
+   [Backend: Python MCP-servers]  <-- DIT IS DE AGENT, "de medewerker"
+        |
+        +--> MQTT subscribe + publish (HiveMQ)
+        +--> TimescaleDB query (historian)
+        +--> Status-heartbeat naar UNS (umh/v1/smc/agents/<naam>/_status, elke 10s)
+```
+
+### Vier eisen aan een UNS-agent
+
+1. **Subscribe op de UNS** — abonneert op MQTT/Kafka-topics
+2. **Status publiceren** — heartbeat elke 10s op `umh/v1/smc/agents/<naam>/_status`, zichtbaar in de UNS zelf
+3. **Met API's praten** — TimescaleDB-historian queryen, analyseren, visualiseren
+4. **Publiceren** — schrijf writes/commands naar de UNS, scoped naar de eigen agent-namespace
+
+Een chat-UI zonder heartbeat en zonder persistent subscribe is **geen agent** — dat is een gespreksvenster met tools. De backend is waar het werk gebeurt.
+
+## Hoofdles — MCP Servers (chat-frontend praat met agent-backend)
+
+Twee MCP-servers (de backends) laten een AI-agent rechtstreeks met je UNS chatten:
 
 | Server | Wat het doet |
 |--------|-------------|
-| `mcp-servers/uns-mqtt` | Subscribe, publish, list topics op de HiveMQ broker |
-| `mcp-servers/uns-timescaledb` | Sensoren, werkorders, sales orders en custom SQL op de historian |
+| `mcp-servers/uns-mqtt` | Subscribe, publish, list topics op de HiveMQ broker + heartbeat |
+| `mcp-servers/uns-timescaledb` | Sensoren, werkorders, sales orders, custom SQL op de historian + heartbeat |
+
+Chat-frontend opties: Claude Desktop (gebruikt in deze sessie), Cursor, of later self-hosted via LibreChat.
 
 Setup: zie [`mcp-servers/README.md`](../mcp-servers/README.md).
 
@@ -24,24 +51,41 @@ Open Claude Desktop → Settings → Developer → Edit Config en plak:
     "uns-timescaledb": {
       "command": "uv",
       "args": ["--directory", "<JOUW-PAD>/UNS-Cursus/mcp-servers/uns-timescaledb", "run", "src/server.py"],
-      "env": { "UNS_DB_DSN": "postgresql://grafanareader:changeme@localhost:5432/umh" }
+      "env": {
+        "UNS_DB_DSN": "postgresql://grafanareader:changeme@localhost:5432/umh",
+        "AGENT_NAME": "uns-timescaledb-<jouwnaam>"
+      }
     },
     "uns-mqtt": {
       "command": "uv",
       "args": ["--directory", "<JOUW-PAD>/UNS-Cursus/mcp-servers/uns-mqtt", "run", "src/server.py"],
-      "env": { "UNS_MQTT_HOST": "localhost", "UNS_MQTT_PORT": "1883" }
+      "env": {
+        "UNS_MQTT_HOST": "localhost",
+        "UNS_MQTT_PORT": "1883",
+        "AGENT_NAME": "uns-mqtt-<jouwnaam>"
+      }
     }
   }
 }
 ```
 
-Vervang `<JOUW-PAD>` door het absolute pad naar je checkout. Herstart Claude Desktop volledig (Quit, niet alleen close).
+Vervang `<JOUW-PAD>` door het absolute pad naar je checkout en `<jouwnaam>` door je voornaam. `AGENT_NAME` is verplicht — de backend gebruikt het voor zijn heartbeat-topic en om publish-rechten te scopen naar `umh/v1/smc/agents/<naam>/...`. Herstart Claude Desktop volledig (Quit, niet alleen close).
+
+Check of je agent leeft:
+```bash
+mosquitto_sub -h localhost -t 'umh/v1/smc/agents/+/_status' -v
+```
+Je moet binnen 10s je eigen agent voorbij zien komen.
 
 ### Voorbeeldvragen voor Claude Desktop
 
-- "Welke MQTT topics zijn nu actief?"
+Eerste twee raken de vier requirements direct:
+
+- "Wat is de status van mijn agent? Leeft hij nog?" (req 2: heartbeat)
+- "Publiceer een testbericht op je eigen agent-namespace" (req 4: scoped publish)
+- "Welke MQTT topics zijn nu actief?" (req 1: subscribe)
 - "Wat zijn de laatste 5 berichten op `umh.v1.smc.vienna.solar._historian`?"
-- "Welke assets heb ik in mijn fabriek?"
+- "Welke assets heb ik in mijn fabriek?" (req 3: API)
 - "Wat was de gemiddelde solar yield vandaag?"
 - "Vergelijk solar output van vandaag met gisteren"
 - "Hoeveel werkorders staan er open en welke hebben prioriteit 1?"
