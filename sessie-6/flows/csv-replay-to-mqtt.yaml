@@ -1,0 +1,83 @@
+# ==============================================================================
+# CSV Replay -> MQTT (UMH Core dataFlow)
+# ==============================================================================
+# Vervangt de externe simulator broker (95.217.14.139:1883 - offline) door de
+# demo CSV's uit sessie-6/bigquery/ in een loop af te spelen op de lokale
+# HiveMQ. Daarmee krijgt de UNS -> BigQuery flow weer levende data tijdens de
+# workshop.
+#
+# Vereisten:
+#   - CSV's gemount in umh-core onder /data/sessie-6/bigquery/
+#       solar_pivoted_1min.csv
+#       weather_pivoted_5min.csv
+#       machine_pivoted_1min.csv
+#   - Lokale HiveMQ draait als 'hivemq' op het umh-network
+#
+# Output topics:
+#   umh/v1/smc/vienna/solar/_historian
+#   umh/v1/smc/vienna/weather/_historian
+#   umh/v1/smc/vienna/machining/_historian
+#
+# Routering: het bestandspad in meta('path') bepaalt het topic en welke kolommen
+# numeriek omgezet worden. Rate-limit op 3 msg/sec houdt BigQuery binnen quotum.
+# ==============================================================================
+
+input:
+  csv:
+    paths:
+      - /data/sessie-6/bigquery/solar_pivoted_1min.csv
+      - /data/sessie-6/bigquery/weather_pivoted_5min.csv
+      - /data/sessie-6/bigquery/machine_pivoted_1min.csv
+    parse_header_row: true
+    batch_count: 1
+
+pipeline:
+  processors:
+    - rate_limit:
+        resource: replay_rate
+    - bloblang: |
+        let path = meta("path").or("")
+        let now_ms = now().ts_unix_milli()
+
+        if $path.contains("solar") {
+          meta target_topic = "umh/v1/smc/vienna/solar/_historian"
+          root.timestamp_ms    = $now_ms
+          root.dc_power_w      = if this.dc_power_w      != "" { this.dc_power_w.number()      } else { null }
+          root.ac_power_w      = if this.ac_power_w      != "" { this.ac_power_w.number()      } else { null }
+          root.panel_temp_c    = if this.panel_temp_c    != "" { this.panel_temp_c.number()    } else { null }
+          root.grid_freq_hz    = if this.grid_freq_hz    != "" { this.grid_freq_hz.number()    } else { null }
+          root.daily_yield_kwh = if this.daily_yield_kwh != "" { this.daily_yield_kwh.number() } else { null }
+        } else if $path.contains("weather") {
+          meta target_topic = "umh/v1/smc/vienna/weather/_historian"
+          root.timestamp_ms     = $now_ms
+          root.solar_irradiance = if this.solar_irradiance != "" { this.solar_irradiance.number() } else { null }
+          root.temperature_c    = if this.temperature_c    != "" { this.temperature_c.number()    } else { null }
+          root.humidity_pct     = if this.humidity_pct     != "" { this.humidity_pct.number()     } else { null }
+          root.cloud_cover_pct  = if this.cloud_cover_pct  != "" { this.cloud_cover_pct.number()  } else { null }
+          root.wind_speed_kmh   = if this.wind_speed_kmh   != "" { this.wind_speed_kmh.number()   } else { null }
+          root.pressure_hpa     = if this.pressure_hpa     != "" { this.pressure_hpa.number()     } else { null }
+        } else if $path.contains("machine") {
+          meta target_topic = "umh/v1/smc/vienna/machining/_historian"
+          root.timestamp_ms       = $now_ms
+          root.run_time_sec       = if this.run_time_sec       != "" { this.run_time_sec.number()       } else { null }
+          root.down_time_sec      = if this.down_time_sec      != "" { this.down_time_sec.number()      } else { null }
+          root.planned_cycle_ms   = if this.planned_cycle_ms   != "" { this.planned_cycle_ms.number()   } else { null }
+          root.downstream_blocked = if this.downstream_blocked != "" { this.downstream_blocked.number() } else { null }
+        } else {
+          root = deleted()
+        }
+
+rate_limit_resources:
+  - label: replay_rate
+    local:
+      count: 3
+      interval: 1s
+
+output:
+  mqtt:
+    urls:
+      - tcp://hivemq:1883
+    topic: ${! meta("target_topic") }
+    client_id: csv-replay-bridge
+    dynamic_client_id_suffix: nanoid
+    qos: 1

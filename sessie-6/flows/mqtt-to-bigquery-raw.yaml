@@ -1,32 +1,38 @@
 # ==============================================================================
-# MQTT → BigQuery Raw Bridge (Standalone Benthos/Redpanda Connect)
+# MQTT -> BigQuery Raw Bridge (UMH Core dataFlow)
 # ==============================================================================
-# Streamt alle MQTT-berichten van HiveMQ naar BigQuery als raw JSON.
-# Draait als standalone container naast de MetalFab stack.
+# Streamt alle MQTT-berichten van de lokale HiveMQ (cursus stack) naar BigQuery
+# als raw JSON. Handig voor 'fire and forget' archivering.
 #
-# Tabel: uns_cursus.uns_raw_test (pre-created)
-# Format: NEWLINE_DELIMITED_JSON
+# Tabel: uns_cursus.uns_raw_test (vooraf aangemaakt)
+# Schema (kolommen): timestamp TIMESTAMP, topic STRING, payload STRING
 #
 # BigQuery load API limiet: max 1500 load jobs/tabel/dag
 # Daarom: grote batches (500 msg of 60s), max_in_flight: 1
+#
+# Vereist op de UMH host (LET OP - vooraf regelen):
+#   1. GCP service account JSON gemount in umh-core container
+#   2. Env var GOOGLE_APPLICATION_CREDENTIALS=/secrets/gcp-key.json
+#   3. Tabel uns_cursus.uns_raw_test bestaat (zie SQL onderaan dit bestand)
 # ==============================================================================
 
 input:
   mqtt:
     urls:
-      - tcp://metalfab-hivemq:1883
+      - tcp://hivemq:1883
     topics:
-      - "umh/v1/metalfab/#"
-    client_id: benthos-bigquery-bridge
+      - "umh/v1/#"
+    client_id: benthos-bigquery-raw-bridge
+    dynamic_client_id_suffix: nanoid
     clean_session: true
     qos: 1
 
 pipeline:
   processors:
     - bloblang: |
-        root.timestamp = now()
-        root.topic = meta("mqtt_topic")
-        root.payload = this.string()
+        root.timestamp = now().ts_format("2006-01-02 15:04:05", "UTC")
+        root.topic     = meta("mqtt_topic").or("")
+        root.payload   = content().string()
 
 output:
   gcp_bigquery:
@@ -40,3 +46,13 @@ output:
     batching:
       count: 500
       period: "60s"
+
+# ------------------------------------------------------------------------------
+# BigQuery DDL voor de raw landing-tabel:
+#
+#   CREATE TABLE IF NOT EXISTS uns_cursus.uns_raw_test (
+#     timestamp TIMESTAMP,
+#     topic     STRING,
+#     payload   STRING
+#   );
+# ------------------------------------------------------------------------------

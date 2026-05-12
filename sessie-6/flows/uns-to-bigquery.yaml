@@ -1,54 +1,62 @@
 # ==============================================================================
-# UNS → BigQuery Bridge (Stand-alone Dataflow)
+# UNS -> BigQuery Bridge (UMH Core dataFlow)
 # ==============================================================================
-# Streamt sensordata van de UNS (Redpanda/Kafka) naar BigQuery.
-# Deploy via UMH Management Console → Data Flows → Stand-alone
+# Streamt sensordata uit de UNS naar BigQuery.
+# Deploy via: umh flow add uns-to-bigquery <pad-naar-dit-bestand>
+# of via UMH Management Console -> Data Flows -> Stand-alone.
 #
-# Vereist:
-#   - GCP service account key als GOOGLE_APPLICATION_CREDENTIALS
-#   - BigQuery dataset 'uns_cursus' in project 've-systems-486013'
-#   - Tabellen: solar_power, weather, machine_production
+# Vereist op de UMH host (LET OP - vooraf regelen):
+#   1. GCP service account JSON key gemount in umh-core container
+#      bv. -v ~/.gcp/uns-cursus-key.json:/secrets/gcp-key.json:ro
+#   2. Env var GOOGLE_APPLICATION_CREDENTIALS=/secrets/gcp-key.json
+#   3. BigQuery dataset 'uns_cursus' in project 've-systems-486013'
+#   4. Tabellen aangemaakt via bigquery/01-create-tables.sql:
+#        solar_power, weather, machine_production
+#
+# UNS topic-pad in deze stack: umh.v1.smc.vienna.{solar|weather|machining}._historian
+# (lokale demo = smc/vienna ; oude externe simulator = metalfab/tilburg)
 # ==============================================================================
 
 input:
-  kafka:
-    addresses:
-      - united-manufacturing-hub-kafka:9092
-    topics:
-      - umh.v1.metalfab.tilburg.solar._historian
-      - umh.v1.metalfab.tilburg.weather._historian
-      - umh.v1.metalfab.tilburg.machining._historian
+  uns:
     consumer_group: uns-to-bigquery
+    umh_topic: umh\.v1\.smc\.vienna\.(solar|weather|machining)\._historian.*
 
 pipeline:
   processors:
-    # Bepaal doeltabel op basis van het Kafka topic
+    # Bepaal doeltabel op basis van het UNS topic
     - bloblang: |
-        let topic = meta("kafka_topic")
+        let umh_topic = meta("umh_topic").or("")
 
-        root.time = this.timestamp_ms.format_timestamp("2006-01-02 15:04:05")
+        # Tijdstempel voor BigQuery (UTC, ISO -> "YYYY-MM-DD HH:MM:SS")
+        # timestamp_ms in UNS payload is unix-ms; ts_format interpreteert
+        # integers als seconden, dus we delen door 1000.
+        let ts_ms = this.timestamp_ms.or(now().ts_unix_milli())
+        root.time = ($ts_ms / 1000).ts_format("2006-01-02 15:04:05", "UTC")
 
-        if $topic.contains("solar") {
+        if $umh_topic.contains("solar") {
           meta bq_table = "solar_power"
-          root.dc_power_w = this.dc_power_w | null
-          root.ac_power_w = this.ac_power_w | null
-          root.panel_temp_c = this.panel_temp_c | null
-          root.grid_freq_hz = this.grid_freq_hz | null
+          root.dc_power_w      = this.dc_power_w | null
+          root.ac_power_w      = this.ac_power_w | null
+          root.panel_temp_c    = this.panel_temp_c | null
+          root.grid_freq_hz    = this.grid_freq_hz | null
           root.daily_yield_kwh = this.daily_yield_kwh | null
-        } else if $topic.contains("weather") {
+        } else if $umh_topic.contains("weather") {
           meta bq_table = "weather"
           root.solar_irradiance = this.solar_irradiance | null
-          root.temperature_c = this.temperature_c | null
-          root.humidity_pct = this.humidity_pct | null
-          root.cloud_cover_pct = this.cloud_cover_pct | null
-          root.wind_speed_kmh = this.wind_speed_kmh | null
-          root.pressure_hpa = this.pressure_hpa | null
-        } else if $topic.contains("machining") {
+          root.temperature_c    = this.temperature_c | null
+          root.humidity_pct     = this.humidity_pct | null
+          root.cloud_cover_pct  = this.cloud_cover_pct | null
+          root.wind_speed_kmh   = this.wind_speed_kmh | null
+          root.pressure_hpa     = this.pressure_hpa | null
+        } else if $umh_topic.contains("machining") {
           meta bq_table = "machine_production"
-          root.run_time_sec = this.run_time_sec | null
-          root.down_time_sec = this.down_time_sec | null
-          root.planned_cycle_ms = this.planned_cycle_ms | null
+          root.run_time_sec       = this.run_time_sec | null
+          root.down_time_sec      = this.down_time_sec | null
+          root.planned_cycle_ms   = this.planned_cycle_ms | null
           root.downstream_blocked = this.downstream_blocked | null
+        } else {
+          root = deleted()
         }
 
 output:
