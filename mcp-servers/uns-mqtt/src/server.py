@@ -7,22 +7,140 @@ Tools:
   - mqtt_publish     Publiceer een bericht naar een topic
   - mqtt_subscribe   Abonneer en ontvang de laatste N berichten
   - mqtt_list_topics Toon actieve topics op de broker
+
+Achtergrond:
+  - Heartbeat task publisht elke 10s agent-status naar
+    umh/v1/smc/agents/{AGENT_NAME}/_status
+  - Scope guard beperkt mqtt_publish tot AGENT_PUBLISH_PREFIX (tenzij
+    AGENT_PUBLISH_ALLOW_PRODUCTION=true).
 """
 
 import asyncio
 import json
+import logging
 import os
 import time
 from contextlib import asynccontextmanager
+from datetime import datetime, timezone
 
 import aiomqtt
 from mcp.server.fastmcp import FastMCP
+
+logger = logging.getLogger("uns-mqtt")
 
 # ---------------------------------------------------------------------------
 # Configuration
 # ---------------------------------------------------------------------------
 MQTT_HOST = os.environ.get("UNS_MQTT_HOST", "localhost")
 MQTT_PORT = int(os.environ.get("UNS_MQTT_PORT", "1883"))
+
+AGENT_NAME = os.environ.get("AGENT_NAME", "luke-agent")
+AGENT_VERSION = "0.1.0"
+HEARTBEAT_INTERVAL_S = 10
+HEARTBEAT_TOPIC = f"umh/v1/smc/agents/{AGENT_NAME}/_status"
+
+# Scope guard config
+AGENT_PUBLISH_PREFIX = os.environ.get(
+    "AGENT_PUBLISH_PREFIX", f"umh/v1/smc/agents/{AGENT_NAME}/"
+)
+AGENT_PUBLISH_ALLOW_PRODUCTION = (
+    os.environ.get("AGENT_PUBLISH_ALLOW_PRODUCTION", "false").lower() == "true"
+)
+PRODUCTION_PREFIX = "umh/v1/smc/"
+
+
+# ---------------------------------------------------------------------------
+# Agent state
+# ---------------------------------------------------------------------------
+class AgentState:
+    """Tracks current agent state for heartbeat publishing."""
+
+    def __init__(self):
+        self.state: str = "idle"
+        self.started_at: float = time.time()
+        self._active_count: int = 0
+        self._lock = asyncio.Lock()
+
+    def uptime_s(self) -> int:
+        return int(time.time() - self.started_at)
+
+    async def enter_processing(self):
+        async with self._lock:
+            self._active_count += 1
+            self.state = "processing"
+
+    async def exit_processing(self):
+        async with self._lock:
+            self._active_count = max(0, self._active_count - 1)
+            if self._active_count == 0:
+                self.state = "idle"
+
+
+agent_state = AgentState()
+
+
+@asynccontextmanager
+async def processing():
+    """Async context manager: marks agent as 'processing' for the duration."""
+    await agent_state.enter_processing()
+    try:
+        yield
+    finally:
+        await agent_state.exit_processing()
+
+
+# ---------------------------------------------------------------------------
+# Internal publish (bypasses scope guard) — used by heartbeat
+# ---------------------------------------------------------------------------
+async def _publish_internal(
+    topic: str, payload: str, retain: bool = False
+) -> None:
+    """Publish to MQTT without going through the scope guard.
+
+    Used by heartbeat and other internal agent-status publishes.
+    """
+    async with aiomqtt.Client(MQTT_HOST, MQTT_PORT) as client:
+        await client.publish(topic, payload.encode("utf-8"), retain=retain)
+
+
+def _build_status_payload(state: str) -> str:
+    return json.dumps({
+        "agent": AGENT_NAME,
+        "state": state,
+        "ts": datetime.now(timezone.utc).isoformat(),
+        "uptime_s": agent_state.uptime_s(),
+        "version": AGENT_VERSION,
+    })
+
+
+# ---------------------------------------------------------------------------
+# Heartbeat task
+# ---------------------------------------------------------------------------
+async def _heartbeat_loop():
+    """Publish agent status every HEARTBEAT_INTERVAL_S seconds."""
+    retry_delay = 2
+    while True:
+        try:
+            payload = _build_status_payload(agent_state.state)
+            await _publish_internal(HEARTBEAT_TOPIC, payload, retain=False)
+            logger.debug(
+                "heartbeat published: topic=%s state=%s uptime=%ss",
+                HEARTBEAT_TOPIC,
+                agent_state.state,
+                agent_state.uptime_s(),
+            )
+            retry_delay = 2
+            await asyncio.sleep(HEARTBEAT_INTERVAL_S)
+        except aiomqtt.MqttError as e:
+            logger.debug("heartbeat MQTT error: %s — retry in %ss", e, retry_delay)
+            await asyncio.sleep(retry_delay)
+            retry_delay = min(retry_delay * 2, 30)
+        except asyncio.CancelledError:
+            return
+        except Exception as e:  # pragma: no cover — defensive
+            logger.debug("heartbeat unexpected error: %s", e)
+            await asyncio.sleep(retry_delay)
+
 
 # ---------------------------------------------------------------------------
 # Topic cache — collects topics seen via wildcard subscription
@@ -84,12 +202,31 @@ class TopicCache:
 # ---------------------------------------------------------------------------
 @asynccontextmanager
 async def lifespan(server: FastMCP):
-    """Start the topic cache listener on startup."""
+    """Start topic cache + heartbeat on startup, publish offline on shutdown."""
     cache = TopicCache()
     await cache.start()
+    heartbeat_task = asyncio.create_task(_heartbeat_loop())
+    logger.debug(
+        "uns-mqtt started — agent=%s prefix=%s allow_production=%s",
+        AGENT_NAME,
+        AGENT_PUBLISH_PREFIX,
+        AGENT_PUBLISH_ALLOW_PRODUCTION,
+    )
     try:
         yield {"cache": cache}
     finally:
+        heartbeat_task.cancel()
+        try:
+            await heartbeat_task
+        except asyncio.CancelledError:
+            pass
+        # Final offline status, retained so subscribers see it on reconnect
+        try:
+            offline_payload = _build_status_payload("offline")
+            await _publish_internal(HEARTBEAT_TOPIC, offline_payload, retain=True)
+            logger.debug("offline status published (retained)")
+        except Exception as e:  # pragma: no cover — defensive
+            logger.debug("could not publish offline status: %s", e)
         await cache.stop()
 
 
@@ -99,10 +236,32 @@ mcp = FastMCP(
         "Je bent verbonden met de MQTT broker (HiveMQ) van een metaalbewerkingsbedrijf. "
         "De broker is onderdeel van een Unified Namespace (UNS) architectuur. "
         "Topics volgen de structuur: umh/v1/{enterprise}/{site}/... "
-        "Je kunt berichten publiceren, topics uitlezen, en zien welke topics actief zijn."
+        "Je kunt berichten publiceren, topics uitlezen, en zien welke topics actief zijn. "
+        f"Je publishes zijn beperkt tot prefix '{AGENT_PUBLISH_PREFIX}' "
+        "(tenzij AGENT_PUBLISH_ALLOW_PRODUCTION=true). Subscriben/listen mag op alles."
     ),
     lifespan=lifespan,
 )
+
+
+# ---------------------------------------------------------------------------
+# Scope guard
+# ---------------------------------------------------------------------------
+def _check_publish_scope(topic: str) -> str | None:
+    """Returns None if topic is allowed, or an error string if denied."""
+    if AGENT_PUBLISH_ALLOW_PRODUCTION:
+        if topic.startswith(PRODUCTION_PREFIX):
+            return None
+        return (
+            f"PUBLISH_DENIED: topic '{topic}' outside production scope "
+            f"'{PRODUCTION_PREFIX}'. Allowed: {PRODUCTION_PREFIX}#"
+        )
+    if topic.startswith(AGENT_PUBLISH_PREFIX):
+        return None
+    return (
+        f"PUBLISH_DENIED: topic '{topic}' outside agent scope "
+        f"'{AGENT_PUBLISH_PREFIX}'. Allowed: {AGENT_PUBLISH_PREFIX}#"
+    )
 
 
 # ===========================================================================
@@ -117,17 +276,23 @@ async def mqtt_publish(topic: str, payload: str) -> str:
     Payload should be a valid JSON string for UNS compatibility.
 
     Args:
-        topic: The MQTT topic to publish to (e.g. 'umh/v1/smc/vienna/_operator/work-order/WO-001').
+        topic: The MQTT topic to publish to (e.g. 'umh/v1/smc/agents/luke-agent/notes/test').
         payload: The message payload, preferably valid JSON.
+
+    NOTE: Publishes are restricted to AGENT_PUBLISH_PREFIX by default.
     """
-    try:
-        async with aiomqtt.Client(MQTT_HOST, MQTT_PORT) as client:
-            await client.publish(topic, payload.encode("utf-8"))
-        return f"Bericht gepubliceerd naar {topic}"
-    except aiomqtt.MqttError as e:
-        return f"MQTT publish error: {e}"
-    except Exception as e:
-        return f"Error: {e}"
+    async with processing():
+        denied = _check_publish_scope(topic)
+        if denied:
+            return denied
+        try:
+            async with aiomqtt.Client(MQTT_HOST, MQTT_PORT) as client:
+                await client.publish(topic, payload.encode("utf-8"))
+            return f"Bericht gepubliceerd naar {topic}"
+        except aiomqtt.MqttError as e:
+            return f"MQTT publish error: {e}"
+        except Exception as e:
+            return f"Error: {e}"
 
 
 @mcp.tool()
@@ -143,39 +308,40 @@ async def mqtt_subscribe(
         timeout_seconds: How long to listen for messages (default: 5, max: 30).
         max_messages: Maximum number of messages to collect (default: 10, max: 50).
     """
-    timeout_seconds = min(timeout_seconds, 30)
-    max_messages = min(max_messages, 50)
-    messages = []
+    async with processing():
+        timeout_seconds = min(timeout_seconds, 30)
+        max_messages = min(max_messages, 50)
+        messages = []
 
-    try:
-        async with aiomqtt.Client(MQTT_HOST, MQTT_PORT) as client:
-            await client.subscribe(topic)
+        try:
+            async with aiomqtt.Client(MQTT_HOST, MQTT_PORT) as client:
+                await client.subscribe(topic)
 
-            try:
-                async with asyncio.timeout(timeout_seconds):
-                    async for message in client.messages:
-                        try:
-                            payload = message.payload.decode("utf-8")
-                        except (UnicodeDecodeError, AttributeError):
-                            payload = str(message.payload)
+                try:
+                    async with asyncio.timeout(timeout_seconds):
+                        async for message in client.messages:
+                            try:
+                                payload = message.payload.decode("utf-8")
+                            except (UnicodeDecodeError, AttributeError):
+                                payload = str(message.payload)
 
-                        messages.append({
-                            "topic": str(message.topic),
-                            "payload": payload,
-                        })
+                            messages.append({
+                                "topic": str(message.topic),
+                                "payload": payload,
+                            })
 
-                        if len(messages) >= max_messages:
-                            break
-            except TimeoutError:
-                pass  # Normal — timeout reached
+                            if len(messages) >= max_messages:
+                                break
+                except TimeoutError:
+                    pass  # Normal — timeout reached
 
-    except aiomqtt.MqttError as e:
-        return f"MQTT subscribe error: {e}"
+        except aiomqtt.MqttError as e:
+            return f"MQTT subscribe error: {e}"
 
-    if not messages:
-        return f"Geen berichten ontvangen op '{topic}' binnen {timeout_seconds} seconden."
+        if not messages:
+            return f"Geen berichten ontvangen op '{topic}' binnen {timeout_seconds} seconden."
 
-    return json.dumps(messages, indent=2, ensure_ascii=False)
+        return json.dumps(messages, indent=2, ensure_ascii=False)
 
 
 @mcp.tool()
@@ -190,44 +356,45 @@ async def mqtt_list_topics(
     Args:
         filter_prefix: Only show topics starting with this prefix (e.g. 'umh/v1/smc').
     """
-    cache: TopicCache = mcp.get_context().lifespan_context["cache"]
+    async with processing():
+        cache: TopicCache = mcp.get_context().lifespan_context["cache"]
 
-    topics = cache.topics
+        topics = cache.topics
 
-    if filter_prefix:
-        topics = {
-            t: v for t, v in topics.items() if t.startswith(filter_prefix)
-        }
-
-    if not topics:
         if filter_prefix:
-            return f"Geen topics gevonden met prefix '{filter_prefix}'. Er zijn {len(cache.topics)} topics in totaal."
-        return (
-            "Nog geen topics gezien. De broker is mogelijk leeg, "
-            "of de achtergrond-listener is net gestart. Wacht even en probeer opnieuw."
+            topics = {
+                t: v for t, v in topics.items() if t.startswith(filter_prefix)
+            }
+
+        if not topics:
+            if filter_prefix:
+                return f"Geen topics gevonden met prefix '{filter_prefix}'. Er zijn {len(cache.topics)} topics in totaal."
+            return (
+                "Nog geen topics gezien. De broker is mogelijk leeg, "
+                "of de achtergrond-listener is net gestart. Wacht even en probeer opnieuw."
+            )
+
+        # Sort by most recent
+        sorted_topics = sorted(
+            topics.values(), key=lambda t: t["timestamp"], reverse=True
         )
 
-    # Sort by most recent
-    sorted_topics = sorted(
-        topics.values(), key=lambda t: t["timestamp"], reverse=True
-    )
+        result = []
+        for entry in sorted_topics[:100]:
+            # Truncate long payloads
+            payload_preview = entry["payload"][:200]
+            if len(entry["payload"]) > 200:
+                payload_preview += "..."
+            result.append({
+                "topic": entry["topic"],
+                "last_payload": payload_preview,
+                "seconds_ago": round(time.time() - entry["timestamp"], 1),
+            })
 
-    result = []
-    for entry in sorted_topics[:100]:
-        # Truncate long payloads
-        payload_preview = entry["payload"][:200]
-        if len(entry["payload"]) > 200:
-            payload_preview += "..."
-        result.append({
-            "topic": entry["topic"],
-            "last_payload": payload_preview,
-            "seconds_ago": round(time.time() - entry["timestamp"], 1),
-        })
-
-    output = json.dumps(result, indent=2, ensure_ascii=False)
-    if len(sorted_topics) > 100:
-        output += f"\n\n... en nog {len(sorted_topics) - 100} topics (niet getoond)"
-    return output
+        output = json.dumps(result, indent=2, ensure_ascii=False)
+        if len(sorted_topics) > 100:
+            output += f"\n\n... en nog {len(sorted_topics) - 100} topics (niet getoond)"
+        return output
 
 
 # ===========================================================================
@@ -243,6 +410,12 @@ def broker_info() -> str:
         "protocol": "MQTT 5.0 (HiveMQ CE)",
         "authentication": "Geen (HIVEMQ_ALLOW_ALL_CLIENTS=true)",
         "topic_structure": "umh/v1/{enterprise}/{site}/{area}/{line}/{workcell}/...",
+        "agent": {
+            "name": AGENT_NAME,
+            "heartbeat_topic": HEARTBEAT_TOPIC,
+            "publish_prefix": AGENT_PUBLISH_PREFIX,
+            "allow_production": AGENT_PUBLISH_ALLOW_PRODUCTION,
+        },
         "examples": {
             "sensor_data": "umh/v1/smc/vienna/cnc-1/temperature",
             "work_order": "umh/v1/smc/vienna/_operator/work-order/WO-001",
@@ -306,6 +479,10 @@ def monitor_production() -> str:
 # ===========================================================================
 
 def main():
+    logging.basicConfig(
+        level=os.environ.get("UNS_MQTT_LOG_LEVEL", "INFO"),
+        format="%(asctime)s %(levelname)s %(name)s %(message)s",
+    )
     mcp.run(transport="stdio")
 
 
