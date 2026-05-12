@@ -6,6 +6,21 @@
 # HiveMQ. Daarmee krijgt de UNS -> BigQuery flow weer levende data tijdens de
 # workshop.
 #
+# Architectuur:
+#   3 parallelle CSV inputs in een broker, zodat solar, weather en machine
+#   gelijktijdig streamen (de oude versie ploegde sequentieel door solar
+#   waardoor weather en machining nooit aan bod kwamen).
+#
+#   Rate per stream is afgestemd op CSV-lengte zodat alle 3 minimaal ~60 min
+#   meegaan tijdens een demo:
+#     solar    (4418 rijen) @ 1 msg/s   = ~73 min
+#     weather   (885 rijen) @ 1/4 msg/s = ~59 min
+#     machine  (4044 rijen) @ 1 msg/s   = ~67 min
+#
+#   LET OP: Benthos csv-input ondersteunt geen ingebouwde loop. Voor langere
+#   demo-sessies: zet de flow even op desiredState=stopped en weer active via
+#   config.yaml; dan herstart Benthos en lezen de CSV's opnieuw vanaf rij 1.
+#
 # Vereisten:
 #   - CSV's gemount in umh-core onder /data/sessie-6/bigquery/
 #       solar_pivoted_1min.csv
@@ -17,29 +32,54 @@
 #   umh/v1/smc/vienna/solar/_historian
 #   umh/v1/smc/vienna/weather/_historian
 #   umh/v1/smc/vienna/machining/_historian
-#
-# Routering: het bestandspad in meta('path') bepaalt het topic en welke kolommen
-# numeriek omgezet worden. Rate-limit op 3 msg/sec houdt BigQuery binnen quotum.
 # ==============================================================================
 
 input:
-  csv:
-    paths:
-      - /data/sessie-6/bigquery/solar_pivoted_1min.csv
-      - /data/sessie-6/bigquery/weather_pivoted_5min.csv
-      - /data/sessie-6/bigquery/machine_pivoted_1min.csv
-    parse_header_row: true
-    batch_count: 1
+  broker:
+    inputs:
+      # --- solar: 4418 rijen, 1 msg/s = ~73 min per loop -------------------
+      - csv:
+          paths:
+            - /data/sessie-6/bigquery/solar_pivoted_1min.csv
+          parse_header_row: true
+          batch_count: 1
+        processors:
+          - rate_limit:
+              resource: solar_rate
+          - mapping: |
+              meta source_stream = "solar"
+
+      # --- weather: 885 rijen, 0.25 msg/s = ~59 min per loop ---------------
+      - csv:
+          paths:
+            - /data/sessie-6/bigquery/weather_pivoted_5min.csv
+          parse_header_row: true
+          batch_count: 1
+        processors:
+          - rate_limit:
+              resource: weather_rate
+          - mapping: |
+              meta source_stream = "weather"
+
+      # --- machine: 4044 rijen, 1 msg/s = ~67 min per loop -----------------
+      - csv:
+          paths:
+            - /data/sessie-6/bigquery/machine_pivoted_1min.csv
+          parse_header_row: true
+          batch_count: 1
+        processors:
+          - rate_limit:
+              resource: machine_rate
+          - mapping: |
+              meta source_stream = "machine"
 
 pipeline:
   processors:
-    - rate_limit:
-        resource: replay_rate
     - bloblang: |
-        let path = meta("path").or("")
+        let stream = meta("source_stream").or("")
         let now_ms = now().ts_unix_milli()
 
-        if $path.contains("solar") {
+        if $stream == "solar" {
           meta target_topic = "umh/v1/smc/vienna/solar/_historian"
           root.timestamp_ms    = $now_ms
           root.dc_power_w      = if this.dc_power_w      != "" { this.dc_power_w.number()      } else { null }
@@ -47,7 +87,7 @@ pipeline:
           root.panel_temp_c    = if this.panel_temp_c    != "" { this.panel_temp_c.number()    } else { null }
           root.grid_freq_hz    = if this.grid_freq_hz    != "" { this.grid_freq_hz.number()    } else { null }
           root.daily_yield_kwh = if this.daily_yield_kwh != "" { this.daily_yield_kwh.number() } else { null }
-        } else if $path.contains("weather") {
+        } else if $stream == "weather" {
           meta target_topic = "umh/v1/smc/vienna/weather/_historian"
           root.timestamp_ms     = $now_ms
           root.solar_irradiance = if this.solar_irradiance != "" { this.solar_irradiance.number() } else { null }
@@ -56,7 +96,7 @@ pipeline:
           root.cloud_cover_pct  = if this.cloud_cover_pct  != "" { this.cloud_cover_pct.number()  } else { null }
           root.wind_speed_kmh   = if this.wind_speed_kmh   != "" { this.wind_speed_kmh.number()   } else { null }
           root.pressure_hpa     = if this.pressure_hpa     != "" { this.pressure_hpa.number()     } else { null }
-        } else if $path.contains("machine") {
+        } else if $stream == "machine" {
           meta target_topic = "umh/v1/smc/vienna/machining/_historian"
           root.timestamp_ms       = $now_ms
           root.run_time_sec       = if this.run_time_sec       != "" { this.run_time_sec.number()       } else { null }
@@ -68,9 +108,17 @@ pipeline:
         }
 
 rate_limit_resources:
-  - label: replay_rate
+  - label: solar_rate
     local:
-      count: 3
+      count: 1
+      interval: 1s
+  - label: weather_rate
+    local:
+      count: 1
+      interval: 4s
+  - label: machine_rate
+    local:
+      count: 1
       interval: 1s
 
 output:
