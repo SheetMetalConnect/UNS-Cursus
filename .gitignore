@@ -10,3 +10,11 @@ sessie-5/demo/erp-dashboard/
 stack/configs/umh-core-config-WORKING.yaml
 sessie-5/transcript.tmp
 sessie-6/bigquery/*_timeseries.csv
+references/
+
+# Trainer-only content (Drive only, niet publiek)
+**/LESPLAN.md
+**/TRAINER-HANDLEIDING.md
+**/UNS_Cursus_Sessie*_Handboek_Outline.md
+**/UNS_Cursus_Sessie*_Handboek.pdf
+**/feedback-form-questions.md
